@@ -1,0 +1,39 @@
+---
+import BaseLayout from "./BaseLayout.astro"
+
+type Props = {
+  title: string
+  description?: string
+  pubDate: Date
+  tags?: string[]
+}
+
+const { title, description, pubDate, tags = [] } = Astro.props
+---
+<BaseLayout title={title} description={description}>
+  <main class="container">
+    <article>
+      <header class="post-header">
+        <p class="post-date">
+          {pubDate.toLocaleDateString("en", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+        <h1>{title}</h1>
+        {description && <p class="lead">{description}</p>}
+        {tags.length > 0 && (
+          <div class="tag-row">
+            {tags.map((tag) => (
+              <span class="tag">{tag}</span>
+            ))}
+          </div>
+        )}
+      </header>
+      <div class="blog-content">
+        <slot />
+      </div>
+    </article>
+  </main>
+</BaseLayout>

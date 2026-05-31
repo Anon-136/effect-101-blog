@@ -1,0 +1,168 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f8fafc;
+  --fg: #0f172a;
+  --muted: #475569;
+  --panel: #ffffff;
+  --border: #dbe4f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #020617;
+    --fg: #dbeafe;
+    --muted: #94a3b8;
+    --panel: #0b1220;
+    --border: #1f2a44;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.2), transparent 32%),
+    radial-gradient(circle at 100% 20%, rgba(14, 165, 233, 0.15), transparent 40%),
+    var(--bg);
+  color: var(--fg);
+}
+
+.container {
+  width: min(52rem, 100% - 2rem);
+  margin: 0 auto;
+  padding: 4rem 0 5rem;
+}
+
+.page-header h1,
+.post-header h1 {
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  font-size: clamp(2.2rem, 6vw, 3.3rem);
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.lead {
+  margin-top: 1rem;
+  color: var(--muted);
+  max-width: 65ch;
+}
+
+.post-grid {
+  margin-top: 2.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.2rem 1.25rem;
+  background: color-mix(in oklab, var(--panel) 96%, transparent);
+}
+
+.post-title {
+  color: inherit;
+  font-size: 1.4rem;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.post-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.post-description,
+.post-date {
+  color: var(--muted);
+}
+
+.post-date {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+}
+
+.tag-row {
+  margin-top: 1.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.blog-content {
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.blog-content h2 {
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.blog-content h3 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.blog-content p {
+  margin: 1.25rem 0;
+}
+
+.blog-content a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.blog-content ul,
+.blog-content ol {
+  margin: 1.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.blog-content li {
+  margin: 0.4rem 0;
+}
+
+.blog-content :not(pre) > code {
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.35rem;
+  background: color-mix(in oklab, currentColor 10%, transparent);
+  font-size: 0.9em;
+}
+
+.blog-content .expressive-code {
+  margin: 1.75rem 0;
+}
+
+.blog-content .expressive-code figure {
+  border-radius: 1rem;
+  overflow: hidden;
+}

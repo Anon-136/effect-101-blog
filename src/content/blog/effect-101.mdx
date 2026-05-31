@@ -1,0 +1,41 @@
+---
+title: "Effect 101"
+description: "Learning Effect like normal TypeScript"
+pubDate: 2026-05-31
+tags: ["effect", "typescript"]
+draft: false
+---
+
+# Effect 101
+
+Effect is a TypeScript framework for building reliable applications.
+
+```ts twoslash
+import { Effect } from "effect"
+const program = Effect.succeed(42)
+program
+// ^?
+```
+
+Use `Effect.gen` when you want code that reads like normal TypeScript:
+
+```ts twoslash
+import { Effect } from "effect"
+const program = Effect.gen(function* () {
+  const name = yield* Effect.succeed("Anon")
+  return `Hello ${name}`
+})
+program
+// ^?
+```
+
+Use `// ---cut---` to hide setup code while keeping TypeScript context:
+
+```ts
+import { Effect } from "effect"
+class UserNotFound extends Error {
+  readonly _tag = "UserNotFound"
+}
+// ---cut---
+const program = Effect.fail(new UserNotFound())
+```
