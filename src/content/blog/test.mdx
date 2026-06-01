@@ -1,0 +1,30 @@
+---
+title: "Test Collapsible"
+description: "Test"
+pubDate: 2026-05-31
+draft: true
+---
+
+## Expressive Code Collapsible Demo
+
+```ts title="example.ts" collapse={2-8}
+import { Effect } from "effect";
+
+const setup = Effect.succeed("hidden setup");
+const moreSetup = Effect.succeed("also hidden");
+
+const program = Effect.gen(function* () {
+  const value = yield* Effect.succeed(1);
+  return value;
+});
+```
+
+```ts twoslash title="twoslash-demo.ts"
+type Result = { ok: true; value: number };
+
+const run = (): Result => ({ ok: true, value: 1 });
+
+const data = run();
+data.value;
+//    ^?
+```

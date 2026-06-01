@@ -9,9 +9,12 @@ export default defineConfig({
   integrations: [
     astroExpressiveCode({
       themes: ["github-light", "github-dark"],
+      defaultProps: {
+        collapseStyle: "collapsible-auto",
+      },
       plugins: [
-        pluginLineNumbers(),
         pluginCollapsibleSections(),
+        pluginLineNumbers(),
         ecTwoSlash({
           includeJsDoc: true,
           allowNonStandardJsDocTags: true,

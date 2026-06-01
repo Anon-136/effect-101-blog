@@ -6,17 +6,17 @@ tags: ["effect", "typescript"]
 draft: false
 ---
 
-# How To Read Effect Code For Beginner
+# Reading Effect Without the Fear
 
 People often say Effect has a steep learning curve, and I get it. When you first see `Effect.gen`, `yield*`, `Layer`, `Runtime`, `Data.TaggedError`, and services everywhere, it can feel like Effect is trying to replace TypeScript with a secret language. But that's not the right way to read it. Effect code is still TypeScript code, the trick is just learning how to read it. Let me show you.
 
 ---
 
-## Start Here: `Effect.gen`
+## `Effect.gen` Is Where It Clicks
 
 This is the first piece of Effect code you should learn to read.
 
-```ts twoslash id="start-effect-gen"
+```ts twoslash id="start-effect-gen" collapse={1-25}
 import { Effect } from "effect";
 
 interface User {
@@ -33,7 +33,7 @@ interface Appointment {
 const getUser = () =>
   Effect.succeed<User>({
     id: "user_1",
-    name: "Anon",
+    name: "John",
   });
 
 const getAppointment = () =>
@@ -42,8 +42,6 @@ const getAppointment = () =>
     userId: "user_1",
     status: "booked",
   });
-
-// ---cut---
 
 const program = Effect.gen(function* () {
   const user = yield* getUser();
@@ -58,30 +56,12 @@ Effect.runPromise(program).then(console.log);
 
 /*
 Output:
-Loaded appointment for Anon
+Loaded appointment for John
 { id: "appointment_1", userId: "user_1", status: "booked" }
 */
 ```
 
-The mental model is simple: read this:
-
-```ts id="read-yield"
-const user = yield* getUser();
-```
-
-like this:
-
-```ts id="read-await"
-const user = await getUser();
-```
-
-Inside `Effect.gen`, this line:
-
-```ts id="yield-meaning"
-yield* someEffect;
-```
-
-means:
+The mental model is simple: read `const user = yield* getUser()` exactly like `const user = await getUser()`. Inside `Effect.gen`, the line `yield* someEffect` means:
 
 > Run this Effect step. If it succeeds, give me the success value. If it fails, stop the whole program with that failure.
 
@@ -98,24 +78,7 @@ const program = Effect.gen(function* () {
 
 is basically the same story as this normal TypeScript:
 
-```ts id="async-await-shape"
-async function program() {
-  const user = await getUser();
-  const appointment = await getAppointment();
-
-  return appointment;
-}
-```
-
-The shape is identical. Effect isn't asking you to forget `async/await`, it's giving you a typed version of the same thing.
-
----
-
-## Normal `async/await` Version
-
-Here's the same example written in plain TypeScript.
-
-```ts id="normal-async-await-version"
+```ts id="async-await-shape" collapse={1-21}
 interface User {
   readonly id: string;
   readonly name: string;
@@ -129,7 +92,7 @@ interface Appointment {
 
 const getUser = async (): Promise<User> => ({
   id: "user_1",
-  name: "Anon",
+  name: "John",
 });
 
 const getAppointment = async (): Promise<Appointment> => ({
@@ -151,32 +114,20 @@ program().then(console.log);
 
 /*
 Output:
-Loaded appointment for Anon
+Loaded appointment for John
 { id: "appointment_1", userId: "user_1", status: "booked" }
 */
 ```
 
-You read the Effect version almost the same way, so this:
-
-```ts id="yield-is-await"
-const user = yield* getUser();
-```
-
-simply means:
-
-```ts id="await-version"
-const user = await getUser();
-```
-
-The only difference is that `yield*` works with Effect values instead of Promise values.
+The shape is identical. Effect isn't asking you to forget `async/await`, it's giving you a typed version of the same thing, the only difference is that `yield*` works with Effect values instead of Promise values.
 
 ---
 
-## Make the Example Concrete: Typed Error Handling
+## Errors That Show Up in the Type
 
 Now let's make the example more realistic. We'll model a flow that finds a user, finds their appointment, returns it, and converts any failure into a single domain error. No dependency injection or service layers yet, just `Effect.gen`, `Data.TaggedError`, and error handling.
 
-```ts twoslash id="concrete-error-handling"
+```ts twoslash id="concrete-error-handling" collapse={1-51}
 import { Data, Effect } from "effect";
 
 interface User {
@@ -211,7 +162,7 @@ const getUser = (userId: string) =>
 
     return {
       id: "user_1",
-      name: "Anon",
+      name: "John",
     };
   });
 
@@ -291,11 +242,11 @@ The failure isn't hidden, it's part of the type.
 
 ---
 
-## Compare to Normal `try/catch/throw`
+## The Old `try/catch` Way
 
 Here's the same idea using normal TypeScript.
 
-```ts id="normal-try-catch-throw"
+```ts id="normal-try-catch-throw" collapse={1-55}
 interface User {
   readonly id: string;
   readonly name: string;
@@ -335,7 +286,7 @@ async function getUser(userId: string): Promise<User> {
 
   return {
     id: "user_1",
-    name: "Anon",
+    name: "John",
   };
 }
 
@@ -391,7 +342,7 @@ The possible failures are invisible. With Effect, the failure lives in the type.
 
 ---
 
-## A Simple Rule: `Effect.gen` for Logic, `.pipe()` for Composition
+## `gen` for Logic, `.pipe()` for Everything Around It
 
 For beginners, this is the style I recommend, use `Effect.gen` for the main story and `.pipe()` for the behavior around it:
 
@@ -406,7 +357,7 @@ Effect.gen(function* () {
 
 Here's a fuller example:
 
-```ts twoslash id="gen-for-logic-pipe-for-composition"
+```ts twoslash id="gen-for-logic-pipe-for-composition" collapse={1-42}
 import { Data, Duration, Effect, Schedule } from "effect";
 
 interface Post {
@@ -486,35 +437,11 @@ Output:
 */
 ```
 
-Look at the shape:
-
-```ts id="logic-and-composition-shape"
-Effect.gen(function* () {
-  const cacheKey = `posts:${userId}`;
-
-  const cached = yield* cacheGet(cacheKey);
-
-  if (cached) {
-    return cached;
-  }
-
-  const posts = yield* findPostsByUser(userId);
-
-  yield* cacheSet(cacheKey, posts);
-
-  return posts;
-}).pipe(
-  Effect.withSpan("fetch_user_posts"),
-  Effect.retry(retryPolicy),
-  Effect.catchTag("DatabaseError", () => Effect.succeed([])),
-);
-```
-
-The business logic lives inside `Effect.gen`, and the operational behavior lives inside `.pipe()`. That separation is what makes the code easy to read.
+With the setup collapsed, the shape is clear: the business logic lives inside `Effect.gen`, and the operational behavior (`withSpan`, `retry`, `catchTag`) lives inside `.pipe()`. That separation is what makes the code easy to read.
 
 ---
 
-## Don't Turn Everything Into a Pipeline Just Because It Is Fun
+## Don't Pipe Everything Just Because You Can
 
 This is perfectly legal, but often harder to read:
 
@@ -530,7 +457,7 @@ Effect.succeed(order).pipe(
 
 It isn't wrong, but the moment you add conditionals, intermediate names, logs, or branching, this style becomes hard to scan. For sequential business logic, prefer this:
 
-```ts twoslash id="prefer-gen-over-too-much-pipe"
+```ts twoslash id="prefer-gen-over-too-much-pipe" collapse={1-53}
 import { Effect } from "effect";
 
 interface Order {
@@ -619,7 +546,7 @@ Easy as that.
 
 ---
 
-## Why `Effect.gen` Has No Arguments
+## Wait, Why Does `Effect.gen` Take No Arguments?
 
 This confuses a lot of beginners. You usually write:
 
@@ -668,13 +595,13 @@ const greet = (name: string) =>
     return `Hello, ${name}`;
   });
 
-const program = greet("Anon");
+const program = greet("John");
 
 Effect.runPromise(program).then(console.log);
 
 /*
 Output:
-Hello, Anon
+Hello, John
 */
 ```
 
@@ -682,11 +609,11 @@ That's fine, but for named business operations, prefer `Effect.fn`.
 
 ---
 
-## `Effect.fn`: Named Effectful Functions
+## `Effect.fn`: Give Your Functions a Name
 
 `Effect.fn` creates named functions that return Effects. Its arguments should be normal business inputs like `userId`, `appointmentId`, `order`, `paymentInput`, `command`, or `query`, while dependencies usually stay in the requirement channel.
 
-```ts twoslash id="effect-fn-example"
+```ts twoslash id="effect-fn-example" collapse={1-44}
 import { Data, Effect } from "effect";
 
 interface User {
@@ -715,7 +642,7 @@ const getUser = (userId: string) =>
 
     return {
       id: userId,
-      name: "Anon",
+      name: "John",
     };
   });
 
@@ -768,7 +695,7 @@ The name is useful for tracing, debugging, and observability, the argument is th
 
 ---
 
-## Effect Has Channels
+## Three Channels to Keep in Mind
 
 Effect tracks different kinds of outcomes. For beginners, think of three channels:
 
@@ -782,11 +709,11 @@ Failure means "this is a normal error that can happen, and I want it tracked." D
 
 ---
 
-## Failure: Expected Error
+## Failure: Errors You Saw Coming
 
 Use `Data.TaggedError` for expected domain errors. Inside `Effect.gen`, tagged errors are yieldable.
 
-```ts twoslash id="failure-channel-example"
+```ts twoslash id="failure-channel-example" collapse={1-14}
 import { Data, Effect } from "effect";
 
 class InsufficientFunds extends Data.TaggedError("InsufficientFunds")<{
@@ -824,7 +751,7 @@ The failure is tracked: before `catchAll`, the program may fail with `Insufficie
 
 ---
 
-## Defect: Unexpected Error
+## Defect: Errors You Didn't
 
 Use `Effect.die` for bugs or impossible states.
 
@@ -862,7 +789,7 @@ catches expected failures but does not handle defects like normal business error
 
 ---
 
-## Throw and Reject
+## When Things Throw
 
 In normal JavaScript, anything can throw.
 
@@ -872,7 +799,7 @@ throw new Error("Boom");
 
 In Effect, throwing inside Effect code is usually treated as an unexpected defect unless you deliberately capture it. Use `Effect.try` or `Effect.tryPromise` when you want to convert thrown or rejected errors into the failure channel.
 
-```ts twoslash id="try-convert-throw-to-failure"
+```ts twoslash id="try-convert-throw-to-failure" collapse={1-5}
 import { Data, Effect } from "effect";
 
 class ParseError extends Data.TaggedError("ParseError")<{
@@ -937,11 +864,11 @@ The Effect version tracks the `ParseError` before you handle it. Again, Effect m
 
 ---
 
-## Error Handling with `catchAll` and `switch`
+## Catching Errors with `catchAll` and `switch`
 
 Use `catchAll` when you want to handle every expected error in the failure channel.
 
-```ts twoslash id="catch-all-switch-example"
+```ts twoslash id="catch-all-switch-example" collapse={1-36}
 import { Data, Effect } from "effect";
 
 interface User {
@@ -965,7 +892,7 @@ const getUser = (userId: string) =>
 
     return {
       id: userId,
-      name: "Anon",
+      name: "John",
     };
   });
 
@@ -1007,7 +934,7 @@ Here's a major difference: normal `try/catch` catches thrown values, while Effec
 
 ---
 
-## Dependency Injection: The Requirement Channel
+## Dependencies Without the Plumbing
 
 Now we can talk about dependencies. In normal TypeScript, dependencies are usually passed as arguments or constructor parameters.
 
@@ -1019,7 +946,7 @@ class UserService {
 
 In Effect, dependencies can live in the requirement channel, so you don't have to manually thread them through every function. Here's a small example.
 
-```ts twoslash id="dependency-injection-requirement-channel"
+```ts twoslash id="dependency-injection-requirement-channel" collapse={1-10}
 import { Data, Effect } from "effect";
 
 interface User {
@@ -1042,7 +969,7 @@ class UserService extends Effect.Service<UserService>()("UserService", {
 
         return {
           id: userId,
-          name: "Anon",
+          name: "John",
         };
       }),
   }),
@@ -1063,7 +990,7 @@ Effect.runPromise(runnable).then(console.log);
 
 /*
 Output:
-Anon
+John
 */
 ```
 
@@ -1077,7 +1004,7 @@ the requirement is gone and the program is ready to run. That's dependency injec
 
 ---
 
-## Providing Dependencies Before Running
+## Wiring It Up Before You Run
 
 You can't run a program that still needs requirements, so you provide them first. For small examples, this is fine:
 
@@ -1087,7 +1014,7 @@ program.pipe(Effect.provide(UserService.Default));
 
 For real applications, prefer creating a runtime once.
 
-```ts twoslash id="managed-runtime-example"
+```ts twoslash id="managed-runtime-example" collapse={1-28}
 import { Data, Effect, ManagedRuntime } from "effect";
 
 interface User {
@@ -1110,7 +1037,7 @@ class UserService extends Effect.Service<UserService>()("UserService", {
 
         return {
           id: userId,
-          name: "Anon",
+          name: "John",
         };
       }),
   }),
@@ -1126,7 +1053,7 @@ runtime.runPromise(program).then(console.log);
 
 /*
 Output:
-{ id: "user_1", name: "Anon" }
+{ id: "user_1", name: "John" }
 */
 ```
 
@@ -1138,11 +1065,11 @@ Create it once at application startup, then reuse it.
 
 ---
 
-## Services and Layers
+## Services Say What, Layers Say How
 
 A service describes _what_ your app needs, and a layer describes _how_ to build it.
 
-```ts twoslash id="services-and-layers-example"
+```ts twoslash id="services-and-layers-example" collapse={1-57}
 import { Data, Effect, Layer, ManagedRuntime } from "effect";
 
 interface User {
@@ -1174,7 +1101,7 @@ class UserService extends Effect.Service<UserService>()("UserService", {
 
         return {
           id: userId,
-          name: "Anon",
+          name: "John",
         };
       }),
   }),
@@ -1250,7 +1177,7 @@ This is the point where Effect starts to feel like a framework, not just an erro
 
 ---
 
-## `Layer.provide` vs `Effect.provide`
+## `Layer.provide` or `Effect.provide`?
 
 Use `Effect.provide` when you're providing dependencies to a program:
 
@@ -1275,7 +1202,7 @@ Most beginners reach for `Effect.provide` first, and you can pick up `Layer.prov
 
 ---
 
-## Final Mental Model
+## Putting It All Together
 
 Effect is a framework, and its code is easiest to read when you start with `Effect.gen`, which lets you write business logic just like `async/await`. From there, `yield*` is the Effect version of `await`, `.pipe()` handles composition (error handling, tracing, retry, timeout, and providing layers), `Effect.fn` creates named effectful functions with arguments, and `Data.TaggedError` defines typed domain errors. As for outcomes, the failure channel is for expected errors, the defect channel is for bugs and impossible states, and the requirement channel is dependency injection, where `Layer` builds your dependencies and `ManagedRuntime` runs your app with them.
 
@@ -1283,7 +1210,7 @@ Once that clicks, Effect becomes much less scary. It's not a secret language, it
 
 ---
 
-## Beginner Cheatsheet: Effect vs Normal TypeScript
+## Cheatsheet: Effect vs Normal TypeScript
 
 | Normal TypeScript                                     | Effect                                          | How to read it                                                   |
 | ----------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
