@@ -11,36 +11,47 @@ type Props = {
 
 const { title, description, pubDate, tags = [] } = Astro.props
 ---
+
 <BaseLayout title={title} description={description}>
   <main class="mx-auto w-[min(44rem,calc(100%-3rem))] py-16 md:py-20">
     <article>
       <header>
         <p class="mb-0 text-sm text-muted">
-          {pubDate.toLocaleDateString("en", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
+          {
+            pubDate.toLocaleDateString("en", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
+          }
         </p>
-        <h1 class="m-0 text-4xl font-semibold leading-[1.06] tracking-[-0.025em] sm:text-5xl">
+        <h1
+          class="m-0 text-4xl font-semibold leading-[1.06] tracking-[-0.025em] sm:text-5xl"
+        >
           {title}
         </h1>
-        {description && (
-          <p class="mt-4 max-w-[65ch] leading-relaxed text-muted">{description}</p>
-        )}
-        {tags.length > 0 && (
-          <div class="mt-4 flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span class="rounded-md border border-border px-2.5 py-1 text-[0.8125rem] text-muted">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        {
+          description && (
+            <p class="mt-4 max-w-[65ch] leading-relaxed text-muted">
+              {description}
+            </p>
+          )
+        }
+        {
+          tags.length > 0 && (
+            <div class="mt-4 flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span class="rounded-md border border-border px-2.5 py-1 text-[0.8125rem] text-muted">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )
+        }
       </header>
       <div class="mt-8">
         <Prose>
-        <slot />
+          <slot />
         </Prose>
       </div>
     </article>
