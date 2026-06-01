@@ -30,7 +30,7 @@ posts.sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
         posts.map((post) => (
           <article class="rounded-md border border-border bg-panel p-5 transition-colors duration-150 hover:border-fg">
             <a
-              href={`/blog/${post.id}/`}
+              href={`/effect-101-blog/blog/${post.id}/`}
               class="text-xl font-semibold tracking-[-0.01em] text-inherit no-underline hover:underline hover:underline-offset-[0.2em]"
             >
               {post.data.title}
