@@ -259,6 +259,7 @@ body {
   padding-left: 1rem;
   border-left: 2px solid var(--border);
   color: var(--muted);
+  /* white-space: pre-wrap; */
 }
 
 /* Horizontal rule: a single hairline, used sparingly */
@@ -346,15 +347,4 @@ hr {
 .blog-content .expressive-code figure {
   border-radius: var(--radius);
   overflow: hidden;
-}
-
-/* ---- Motion: respect reduced-motion --------------------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
 }
