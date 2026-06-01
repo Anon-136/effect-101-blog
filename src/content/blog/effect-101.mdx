@@ -70,7 +70,7 @@ Loaded appointment for John
 The mental model is honestly easier than it looks. Read this:
 
 ```ts id="read-yield"
-const user = yield * getUser()
+const user = yield* getUser()
 ```
 
 exactly like this:
@@ -142,11 +142,11 @@ import { Data, Effect } from "effect"
 interface User {
   readonly id: string
   readonly name: string
+  readonly nextAppointmentId: string
 }
 
 interface Appointment {
   readonly id: string
-  readonly userId: string
   readonly status: "booked" | "cancelled"
 }
 
@@ -155,7 +155,7 @@ class UserNotFound extends Data.TaggedError("UserNotFound")<{
 }> {}
 
 class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly userId: string
+  readonly appointmentId: string
 }> {}
 
 class BookingLookupError extends Data.TaggedError("BookingLookupError")<{
@@ -170,22 +170,22 @@ const getUser = (userId: string): Effect.Effect<User, UserNotFound> =>
     }
 
     return {
-      id: "user_1",
+      id: userId,
       name: "John",
+      nextAppointmentId: "appointment_1",
     }
   })
 
 const getAppointment = (
-  userId: string,
+  appointmentId: string,
 ): Effect.Effect<Appointment, AppointmentNotFound> =>
   Effect.gen(function* () {
-    if (userId !== "user_1") {
-      return yield* new AppointmentNotFound({ userId })
+    if (appointmentId !== "appointment_1") {
+      return yield* new AppointmentNotFound({ appointmentId })
     }
 
     return {
-      id: "appointment_1",
-      userId,
+      id: appointmentId,
       status: "booked",
     }
   })
@@ -193,7 +193,7 @@ const getAppointment = (
 const getUserAppointment = (userId: string) =>
   Effect.gen(function* () {
     const user = yield* getUser(userId)
-    const appointment = yield* getAppointment(user.id)
+    const appointment = yield* getAppointment(user.nextAppointmentId)
 
     return appointment
   }).pipe(
@@ -205,7 +205,7 @@ const getUserAppointment = (userId: string) =>
         }),
       AppointmentNotFound: (error) =>
         new BookingLookupError({
-          message: `Cannot find appointment for user ${error.userId}`,
+          message: `Cannot find appointment ${error.appointmentId}`,
           cause: error,
         }),
     }),
@@ -218,7 +218,7 @@ Effect.runPromise(program).then(console.log)
 
 /*
 Output:
-{ id: "appointment_1", userId: "user_1", status: "booked" }
+{ id: "appointment_1", status: "booked" }
 */
 ```
 
@@ -235,11 +235,11 @@ For comparison, here's the same idea done the old-fashioned way, with `try/catch
 interface User {
   readonly id: string
   readonly name: string
+  readonly nextAppointmentId: string
 }
 
 interface Appointment {
   readonly id: string
-  readonly userId: string
   readonly status: "booked" | "cancelled"
 }
 
@@ -250,8 +250,8 @@ class UserNotFound extends Error {
 }
 
 class AppointmentNotFound extends Error {
-  constructor(readonly userId: string) {
-    super(`Appointment not found for user: ${userId}`)
+  constructor(readonly appointmentId: string) {
+    super(`Appointment not found: ${appointmentId}`)
   }
 }
 
@@ -270,19 +270,19 @@ async function getUser(userId: string): Promise<User> {
   }
 
   return {
-    id: "user_1",
+    id: userId,
     name: "John",
+    nextAppointmentId: "appointment_1",
   }
 }
 
-async function getAppointment(userId: string): Promise<Appointment> {
-  if (userId !== "user_1") {
-    throw new AppointmentNotFound(userId)
+async function getAppointment(appointmentId: string): Promise<Appointment> {
+  if (appointmentId !== "appointment_1") {
+    throw new AppointmentNotFound(appointmentId)
   }
 
   return {
-    id: "appointment_1",
-    userId,
+    id: appointmentId,
     status: "booked",
   }
 }
@@ -290,7 +290,7 @@ async function getAppointment(userId: string): Promise<Appointment> {
 async function getUserAppointment(userId: string): Promise<Appointment> {
   try {
     const user = await getUser(userId)
-    const appointment = await getAppointment(user.id)
+    const appointment = await getAppointment(user.nextAppointmentId)
 
     return appointment
   } catch (error) {
@@ -299,7 +299,7 @@ async function getUserAppointment(userId: string): Promise<Appointment> {
     }
     if (error instanceof AppointmentNotFound) {
       throw new BookingLookupError(
-        `Cannot find appointment for user ${error.userId}`,
+        `Cannot find appointment ${error.appointmentId}`,
         error,
       )
     }
@@ -314,7 +314,7 @@ promise.then(console.log)
 
 /*
 Output:
-{ id: "appointment_1", userId: "user_1", status: "booked" }
+{ id: "appointment_1", status: "booked" }
 */
 ```
 
@@ -453,17 +453,17 @@ Once a `Promise` starts, you're already too late to decide how it should run. Yo
 
 `Effect.fn` lets you create named functions that return Effects. Its arguments should be normal business inputs you'd expect, things like `userId`, `appointmentId`, `order`, `paymentInput`, `command`, or `query`.
 
-```ts twoslash id="effect-fn-example" collapse={1-42}
+```ts twoslash id="effect-fn-example" collapse={1-44}
 import { Data, Effect } from "effect"
 
 interface User {
   readonly id: string
   readonly name: string
+  readonly nextAppointmentId: string
 }
 
 interface Appointment {
   readonly id: string
-  readonly userId: string
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
@@ -471,7 +471,7 @@ class UserNotFound extends Data.TaggedError("UserNotFound")<{
 }> {}
 
 class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly userId: string
+  readonly appointmentId: string
 }> {}
 
 const getUser = Effect.fn("getUser")(function* (userId: string) {
@@ -481,17 +481,19 @@ const getUser = Effect.fn("getUser")(function* (userId: string) {
   const user: User = {
     id: userId,
     name: "John",
+    nextAppointmentId: "appointment_1",
   }
   return user
 })
 
-const getAppointment = Effect.fn("getAppointment")(function* (userId: string) {
-  if (userId !== "user_1") {
-    return yield* new AppointmentNotFound({ userId })
+const getAppointment = Effect.fn("getAppointment")(function* (
+  appointmentId: string,
+) {
+  if (appointmentId !== "appointment_1") {
+    return yield* new AppointmentNotFound({ appointmentId })
   }
   const appointment: Appointment = {
-    id: "appointment_1",
-    userId,
+    id: appointmentId,
   }
   return appointment
 })
@@ -500,7 +502,7 @@ const getAppointmentForUser = Effect.fn("getAppointmentForUser")(function* (
   userId: string,
 ) {
   const user = yield* getUser(userId)
-  const appointment = yield* getAppointment(user.id)
+  const appointment = yield* getAppointment(user.nextAppointmentId)
 
   return appointment
 })
@@ -514,7 +516,7 @@ Effect.runPromise(program).then(console.log)
 
 /*
 Output:
-{ id: "appointment_1", userId: "user_1" }
+{ id: "appointment_1" }
 */
 ```
 
