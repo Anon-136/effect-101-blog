@@ -6,36 +6,1935 @@ tags: ["effect", "typescript"]
 draft: false
 ---
 
-# Effect 101
+# Effect 101: Reading Effect Like Normal TypeScript
 
-Effect is a TypeScript framework for building reliable applications.
+Effect is a framework for building TypeScript applications with typed errors, dependency injection, concurrency, retries, resource management, logging, tracing, and runtime execution.
 
-```ts twoslash
-import { Effect } from "effect"
-const program = Effect.succeed(42)
-program
-// ^?
-```
+`Effect.Effect` is the core data type.
 
-Use `Effect.gen` when you want code that reads like normal TypeScript:
+The simplest mental model is:
 
-```ts twoslash
-import { Effect } from "effect"
-const program = Effect.gen(function* () {
-  const name = yield* Effect.succeed("Anon")
-  return `Hello ${name}`
-})
-program
-// ^?
-```
+> `Effect.Effect` is a lazy result/computation.
 
-Use `// ---cut---` to hide setup code while keeping TypeScript context:
+Or, more casually:
+
+> An `Effect` is a program that has not run yet.
+
+It is similar to a `Promise`, but more explicit. A `Promise<A>` only tells you the success value. An `Effect.Effect<A, E, R>` tells you:
 
 ```ts
-import { Effect } from "effect"
-class UserNotFound extends Error {
-  readonly _tag = "UserNotFound"
-}
-// ---cut---
-const program = Effect.fail(new UserNotFound())
+Effect.Effect<Success, Error, Requirements>;
 ```
+
+Meaning:
+
+```ts
+Effect.Effect<A, E, R>;
+```
+
+| Type Parameter | Meaning        | Beginner Translation                             |
+| -------------- | -------------- | ------------------------------------------------ |
+| `A`            | Success value  | “What do I get if it works?”                     |
+| `E`            | Expected error | “What known errors can happen?”                  |
+| `R`            | Requirements   | “What services/config/context must be provided?” |
+
+Example:
+
+```ts twoslash
+import { Effect } from "effect";
+
+declare const program: Effect.Effect<string, Error, never>;
+```
+
+Read it as:
+
+> This program returns a `string`, may fail with an `Error`, and needs no services.
+
+Another example:
+
+```ts twoslash
+import { Effect } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+class UserNotFound extends Error {}
+
+interface UserRepository {
+  readonly findById: (id: string) => Effect.Effect<User, UserNotFound>;
+}
+
+declare const getUser: Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+Read it as:
+
+> This program returns a `User`, may fail with `UserNotFound`, and requires `UserRepository`.
+
+That is the main idea.
+
+Effect makes the invisible parts of JavaScript visible in the type system.
+
+---
+
+## 1. Why Effect Exists
+
+Normal TypeScript hides many important things.
+
+```ts
+const getUser = async (id: string): Promise<User> => {
+  const response = await fetch(`/users/${id}`);
+
+  if (!response.ok) {
+    throw new Error("User not found");
+  }
+
+  return response.json();
+};
+```
+
+The type says:
+
+```ts
+Promise<User>;
+```
+
+But the real behavior is:
+
+```ts
+// returns User
+// may throw
+// performs async work
+// uses fetch
+// may fail because of network
+// may fail because JSON parsing failed
+```
+
+Effect makes this explicit.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+const getUser = (id: string): Effect.Effect<User, UserNotFound> =>
+  id === "1"
+    ? Effect.succeed({ id: "1", name: "Anon" })
+    : Effect.fail(new UserNotFound({ id }));
+```
+
+Now the type tells the truth:
+
+```ts
+Effect.Effect<User, UserNotFound, never>;
+```
+
+Meaning:
+
+> This computation succeeds with `User`, can fail with `UserNotFound`, and requires nothing from the environment.
+
+---
+
+## 2. The Cheatsheet
+
+### Core Type
+
+```ts
+Effect.Effect<A, E, R>;
+```
+
+| Concept                       | Meaning                               |
+| ----------------------------- | ------------------------------------- |
+| `A`                           | Success                               |
+| `E`                           | Expected error                        |
+| `R`                           | Required services/context             |
+| `never` in `E`                | Cannot fail with expected errors      |
+| `never` in `R`                | Needs no dependencies                 |
+| `Effect.succeed(a)`           | Create successful Effect              |
+| `Effect.fail(e)`              | Create failed Effect                  |
+| `Effect.sync(() => value)`    | Lazy synchronous side effect          |
+| `Effect.tryPromise(...)`      | Wrap Promise/async code               |
+| `Effect.gen(function* () {})` | `async/await`-style Effect code       |
+| `Effect.fn("name")(...)`      | Named/traced effectful function       |
+| `.pipe(...)`                  | Compose transformations               |
+| `Effect.catchTag(...)`        | Handle tagged error                   |
+| `Effect.catchAll(...)`        | Handle all expected errors            |
+| `Effect.die(...)`             | Unexpected defect                     |
+| `Effect.runPromise(program)`  | Run Effect as Promise                 |
+| `Effect.runSync(program)`     | Run synchronous Effect                |
+| `Effect.Service`              | Define service + layer                |
+| `Layer`                       | Build/provide dependencies            |
+| `Effect.provide(...)`         | Provide dependencies to a program     |
+| `ManagedRuntime`              | Build a reusable runtime from a layer |
+
+---
+
+## 3. How to Read Effect Like Normal TypeScript
+
+When you see this:
+
+```ts
+const program: Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+Translate it to normal TypeScript in your head:
+
+```ts
+async function program(userRepository: UserRepository): Promise<User> {
+  // may fail with UserNotFound
+}
+```
+
+But the Effect version is better because:
+
+1. The error is typed.
+2. The dependency is typed.
+3. The program is lazy.
+4. It can be composed before it runs.
+5. It can be retried, timed out, logged, traced, interrupted, and tested.
+
+---
+
+## 4. Lazy Computation
+
+Effect values do not run when you create them.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.sync(() => {
+  console.log("Running!");
+  return 123;
+});
+
+// Nothing printed yet.
+
+Effect.runSync(program);
+// Prints: Running!
+```
+
+This is different from eager JavaScript.
+
+```ts
+const value = (() => {
+  console.log("Running!");
+  return 123;
+})();
+
+// Already printed.
+```
+
+An Effect is a description of work.
+
+It runs only when passed to a runtime, such as:
+
+```ts
+Effect.runSync(program);
+Effect.runPromise(program);
+Effect.runFork(program);
+```
+
+For beginners, you can think:
+
+> Creating an Effect is writing the recipe. Running an Effect is cooking the meal.
+
+---
+
+## 5. `Effect.succeed`, `Effect.fail`, and `Effect.sync`
+
+### `Effect.succeed`
+
+Use when you already have a value.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.succeed(42);
+
+// Effect.Effect<number, never, never>
+```
+
+Read as:
+
+> This program succeeds with `42`.
+
+---
+
+### `Effect.fail`
+
+Use for expected, typed failure.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class ValidationError extends Data.TaggedError("ValidationError")<{
+  readonly message: string;
+}> {}
+
+const program = Effect.fail(new ValidationError({ message: "Invalid email" }));
+
+// Effect.Effect<never, ValidationError, never>
+```
+
+Read as:
+
+> This program does not produce a success value. It fails with `ValidationError`.
+
+---
+
+### `Effect.sync`
+
+Use to wrap synchronous side effects.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const now = Effect.sync(() => new Date());
+
+// Effect.Effect<Date, never, never>
+```
+
+Important:
+
+```ts
+const now = new Date();
+```
+
+runs immediately.
+
+But:
+
+```ts
+const now = Effect.sync(() => new Date());
+```
+
+runs later.
+
+---
+
+## 6. `Effect.tryPromise`
+
+Use `Effect.tryPromise` to wrap async code that may throw or reject.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class FetchUserError extends Data.TaggedError("FetchUserError")<{
+  readonly cause: unknown;
+}> {}
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+const fetchUser = (id: string): Effect.Effect<User, FetchUserError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const response = await fetch(`https://example.com/users/${id}`);
+
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+
+      return response.json() as Promise<User>;
+    },
+    catch: (cause) => new FetchUserError({ cause }),
+  });
+```
+
+Normal JavaScript version:
+
+```ts
+const fetchUser = async (id: string): Promise<User> => {
+  const response = await fetch(`https://example.com/users/${id}`);
+
+  if (!response.ok) {
+    throw new Error("Request failed");
+  }
+
+  return response.json();
+};
+```
+
+Effect version:
+
+```ts
+(id: string) => Effect.Effect<User, FetchUserError, never>;
+```
+
+Now the error is visible in the type.
+
+---
+
+## 7. `Effect.gen`: The Effect Version of `async/await`
+
+`Effect.gen` lets you write Effect code in a sequential style.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+interface Appointment {
+  readonly id: string;
+  readonly userId: string;
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
+  readonly id: string;
+}> {}
+
+const getUser = (id: string): Effect.Effect<User, UserNotFound> =>
+  id === "1"
+    ? Effect.succeed({ id, name: "Anon" })
+    : Effect.fail(new UserNotFound({ id }));
+
+const getAppointment = (
+  id: string,
+): Effect.Effect<Appointment, AppointmentNotFound> =>
+  id === "a1"
+    ? Effect.succeed({ id, userId: "1" })
+    : Effect.fail(new AppointmentNotFound({ id }));
+
+const program = Effect.gen(function* () {
+  const appointment = yield* getAppointment("a1");
+  const user = yield* getUser(appointment.userId);
+
+  return {
+    appointment,
+    user,
+  };
+});
+```
+
+Read this like:
+
+```ts
+const appointment = await getAppointment("a1");
+const user = await getUser(appointment.userId);
+
+return { appointment, user };
+```
+
+But with Effect:
+
+- `yield*` unwraps successful values.
+- Expected errors short-circuit automatically.
+- The final type includes all possible errors.
+
+The inferred type is roughly:
+
+```ts
+Effect.Effect<
+  {
+    appointment: Appointment;
+    user: User;
+  },
+  AppointmentNotFound | UserNotFound,
+  never
+>;
+```
+
+Meaning:
+
+> This program returns appointment + user, but it may fail with either `AppointmentNotFound` or `UserNotFound`.
+
+---
+
+## 8. `yield*` Means “Run This Step and Give Me the Success Value”
+
+Inside `Effect.gen`, this:
+
+```ts
+const user = yield * getUser("1");
+```
+
+means:
+
+> Execute the Effect. If it succeeds, put the success value into `user`. If it fails, stop the whole program with that error.
+
+Equivalent mental model:
+
+```ts
+const user = await getUser("1");
+```
+
+But with typed errors.
+
+---
+
+## 9. Error Channel vs Defect Channel
+
+Effect has an important distinction:
+
+| Type           | Meaning                      | Beginner Translation                     |
+| -------------- | ---------------------------- | ---------------------------------------- |
+| Expected Error | Business/application failure | “This can happen and we planned for it.” |
+| Defect         | Unexpected bug               | “This should not happen.”                |
+| Interruption   | Fiber was stopped            | “The program was cancelled.”             |
+
+### Expected Error
+
+Use `Effect.fail`.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+const program = Effect.fail(new UserNotFound({ id: "123" }));
+```
+
+This is for normal domain errors:
+
+- User not found
+- Invalid input
+- Payment rejected
+- Unauthorized
+- Appointment slot unavailable
+
+These should usually be represented in the error channel.
+
+---
+
+### Defect
+
+Use `Effect.die` or let unexpected exceptions become defects.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.die("Impossible state");
+```
+
+This is for programmer bugs or impossible states:
+
+- Invariant violation
+- Unexpected null
+- Corrupted state
+- A branch that should be unreachable
+
+You usually do not recover from defects in business logic.
+
+---
+
+## 10. `Data.TaggedError`
+
+`Data.TaggedError` gives your errors a `_tag`.
+
+That makes them easy to pattern match.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class DatabaseError extends Data.TaggedError("DatabaseError")<{
+  readonly cause: unknown;
+}> {}
+
+const getUser = (
+  id: string,
+): Effect.Effect<string, UserNotFound | DatabaseError> =>
+  id === "1" ? Effect.succeed("Anon") : Effect.fail(new UserNotFound({ id }));
+
+const program = getUser("2").pipe(
+  Effect.catchTag("UserNotFound", (error) =>
+    Effect.succeed(`Fallback user for ${error.id}`),
+  ),
+);
+```
+
+The `_tag` is useful because you can handle one error without catching everything.
+
+```ts
+Effect.catchTag("UserNotFound", ...)
+```
+
+is more precise than:
+
+```ts
+Effect.catchAll(...)
+```
+
+Prefer tagged domain errors instead of throwing generic `Error`.
+
+---
+
+## 11. Catching Errors
+
+### Catch One Error
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+const getUserName = (id: string): Effect.Effect<string, UserNotFound> =>
+  Effect.fail(new UserNotFound({ id }));
+
+const program = getUserName("123").pipe(
+  Effect.catchTag("UserNotFound", (error) =>
+    Effect.succeed(`Unknown user: ${error.id}`),
+  ),
+);
+```
+
+Read as:
+
+> Try to get the user name. If the error is `UserNotFound`, recover with a fallback string.
+
+---
+
+### Catch All Expected Errors
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class DatabaseError extends Data.TaggedError("DatabaseError")<{
+  readonly cause: unknown;
+}> {}
+
+const program: Effect.Effect<string, UserNotFound | DatabaseError> =
+  Effect.fail(new UserNotFound({ id: "123" }));
+
+const recovered = program.pipe(
+  Effect.catchAll((error) => Effect.succeed(`Recovered from ${error._tag}`)),
+);
+```
+
+Use `catchAll` at boundaries.
+
+For example:
+
+- HTTP controller
+- CLI command
+- queue worker
+- test boundary
+
+Avoid catching everything too early because you lose useful error information.
+
+---
+
+## 12. `.pipe()`: Reading Effect Left to Right
+
+Effect code often uses `.pipe()`.
+
+```ts twoslash
+import { Effect, Schedule } from "effect";
+
+declare const callApi: Effect.Effect<string, Error>;
+
+const program = callApi.pipe(
+  Effect.timeout("5 seconds"),
+  Effect.retry(Schedule.recurs(3)),
+  Effect.tap((result) => Effect.logInfo(`Result: ${result}`)),
+);
+```
+
+Read it top to bottom:
+
+1. Start with `callApi`
+2. Add a timeout
+3. Retry up to 3 times
+4. Log the result if it succeeds
+
+This is like fluent chaining:
+
+```ts
+callApi.timeout("5 seconds").retry(3).tap(log);
+```
+
+Effect uses `.pipe()` because functions are composable.
+
+---
+
+## 13. `Effect.tap`: Do Something Without Changing the Value
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.succeed(123).pipe(
+  Effect.tap((value) => Effect.logInfo(`Value is ${value}`)),
+);
+```
+
+The final success value is still `123`.
+
+Use `tap` for:
+
+- logging
+- metrics
+- debugging
+- audit events
+- tracing annotations
+
+Do not use `tap` when you want to transform the value.
+
+Use `Effect.map` for transformation.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.succeed(123).pipe(Effect.map((value) => value * 2));
+```
+
+---
+
+## 14. `Effect.fn`: Named Effectful Functions
+
+Effect Solutions recommends using `Effect.fn` for named, traced effects.
+
+Simple example:
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+const getUserName = Effect.fn("getUserName")(function* (id: string) {
+  if (id !== "1") {
+    return yield* new UserNotFound({ id });
+  }
+
+  return "Anon";
+});
+```
+
+This creates a normal function:
+
+```ts
+(id: string) => Effect.Effect<string, UserNotFound, never>;
+```
+
+You call it like this:
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+const getUserName = Effect.fn("getUserName")(function* (id: string) {
+  if (id !== "1") {
+    return yield* new UserNotFound({ id });
+  }
+
+  return "Anon";
+});
+
+const program = getUserName("1");
+```
+
+Use `Effect.fn` when:
+
+- defining service methods
+- defining use cases
+- defining important domain operations
+- you want better tracing/logging names
+- you want consistent function style
+
+---
+
+## 15. `Effect.fn` With Cross-Cutting Concerns
+
+`Effect.fn` can take a second argument to transform the whole effect.
+
+Example:
+
+```ts twoslash
+import { Effect, flow, Schedule } from "effect";
+
+class NetworkError extends Error {}
+
+declare const fetchText: (url: string) => Effect.Effect<string, NetworkError>;
+
+const fetchWithPolicy = Effect.fn("fetchWithPolicy")(
+  function* (url: string) {
+    const text = yield* fetchText(url);
+    return text;
+  },
+  flow(Effect.timeout("5 seconds"), Effect.retry(Schedule.recurs(3))),
+);
+```
+
+Read as:
+
+> Define the business logic once, then apply timeout/retry around the whole function.
+
+This is useful for:
+
+- retry
+- timeout
+- logging
+- tracing
+- metrics
+- annotations
+
+---
+
+## 16. Service: Dependency Injection in Effect
+
+In normal TypeScript, you might write:
+
+```ts
+class UserService {
+  constructor(private readonly repo: UserRepository) {}
+
+  getUser(id: string) {
+    return this.repo.findById(id);
+  }
+}
+```
+
+In Effect, services are dependencies in the `R` channel.
+
+A program that needs a service has a type like:
+
+```ts
+Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+Meaning:
+
+> I can produce a `User`, but someone must provide `UserRepository`.
+
+---
+
+## 17. `Effect.Service`
+
+`Effect.Service` lets you define a service and its default layer together.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class UserRepository extends Effect.Service<UserRepository>()(
+  "UserRepository",
+  {
+    accessors: true,
+    sync: () => ({
+      findById: (id: string): Effect.Effect<User, UserNotFound> =>
+        id === "1"
+          ? Effect.succeed({ id, name: "Anon" })
+          : Effect.fail(new UserNotFound({ id })),
+    }),
+  },
+) {}
+```
+
+Because `accessors: true` is enabled, you can call:
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class UserRepository extends Effect.Service<UserRepository>()(
+  "UserRepository",
+  {
+    accessors: true,
+    sync: () => ({
+      findById: (id: string): Effect.Effect<User, UserNotFound> =>
+        id === "1"
+          ? Effect.succeed({ id, name: "Anon" })
+          : Effect.fail(new UserNotFound({ id })),
+    }),
+  },
+) {}
+
+const program = UserRepository.findById("1");
+```
+
+The type of `program` is roughly:
+
+```ts
+Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+Read as:
+
+> This program needs `UserRepository`.
+
+---
+
+## 18. Layers: Building Services
+
+A `Layer` builds/provides services.
+
+The service above automatically has a default layer:
+
+```ts
+UserRepository.Default;
+```
+
+You provide it like this:
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class UserRepository extends Effect.Service<UserRepository>()(
+  "UserRepository",
+  {
+    accessors: true,
+    sync: () => ({
+      findById: (id: string): Effect.Effect<User, UserNotFound> =>
+        id === "1"
+          ? Effect.succeed({ id, name: "Anon" })
+          : Effect.fail(new UserNotFound({ id })),
+    }),
+  },
+) {}
+
+const program = UserRepository.findById("1").pipe(
+  Effect.provide(UserRepository.Default),
+);
+```
+
+After providing the layer, the requirement disappears.
+
+Before:
+
+```ts
+Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+After:
+
+```ts
+Effect.Effect<User, UserNotFound, never>;
+```
+
+That is the purpose of `Layer`.
+
+---
+
+## 19. Layer Mental Model
+
+A service is what your program needs.
+
+A layer is how to build it.
+
+| Concept                 | Normal TypeScript Equivalent |
+| ----------------------- | ---------------------------- |
+| Service                 | Interface/class dependency   |
+| Layer                   | Constructor/factory/provider |
+| `R` channel             | Missing dependency list      |
+| `Effect.provide(layer)` | Dependency injection         |
+| `Layer.mergeAll(...)`   | Compose dependency graph     |
+
+Example:
+
+```ts twoslash
+import { Effect, Layer } from "effect";
+
+class Config extends Effect.Service<Config>()("Config", {
+  sync: () => ({
+    apiUrl: "https://example.com",
+  }),
+}) {}
+
+class HttpClient extends Effect.Service<HttpClient>()("HttpClient", {
+  accessors: true,
+  effect: Effect.gen(function* () {
+    const config = yield* Config;
+
+    return {
+      get: (path: string) => Effect.succeed(`GET ${config.apiUrl}${path}`),
+    };
+  }),
+}) {}
+
+const MainLayer = Layer.mergeAll(Config.Default, HttpClient.Default);
+```
+
+`HttpClient` depends on `Config`.
+
+But callers of `HttpClient.get(...)` do not need to know how `HttpClient` is constructed.
+
+That is idiomatic Effect:
+
+> Keep construction dependencies in layers, not in every service method signature.
+
+---
+
+## 20. `Layer.provide` vs `Effect.provide`
+
+You will usually use `Effect.provide`.
+
+```ts
+program.pipe(Effect.provide(MainLayer));
+```
+
+That means:
+
+> Run this program with these dependencies.
+
+`Layer.provide` is for building a layer from other layers.
+
+```ts
+const AppLayer = SomeLayer.pipe(Layer.provide(DependencyLayer));
+```
+
+That means:
+
+> Build `SomeLayer` by giving it `DependencyLayer`.
+
+Beginner rule:
+
+- Use `Effect.provide(...)` when providing dependencies to a program.
+- Use `Layer.provide(...)` when providing dependencies to another layer.
+
+---
+
+## 21. ManagedRuntime
+
+At the edge of your application, you need to run Effects.
+
+Simple scripts can use:
+
+```ts
+Effect.runPromise(program);
+```
+
+But apps usually have dependencies.
+
+You do not want to write this everywhere:
+
+```ts
+program.pipe(Effect.provide(MainLayer));
+```
+
+So you can create a `ManagedRuntime`.
+
+```ts twoslash
+import { Data, Effect, ManagedRuntime } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class UserRepository extends Effect.Service<UserRepository>()(
+  "UserRepository",
+  {
+    accessors: true,
+    sync: () => ({
+      findById: (id: string): Effect.Effect<User, UserNotFound> =>
+        id === "1"
+          ? Effect.succeed({ id, name: "Anon" })
+          : Effect.fail(new UserNotFound({ id })),
+    }),
+  },
+) {}
+
+const runtime = ManagedRuntime.make(UserRepository.Default);
+
+const program = UserRepository.findById("1");
+
+runtime.runPromise(program);
+```
+
+Use `ManagedRuntime` when integrating Effect with:
+
+- HTTP frameworks
+- CLI commands
+- queues
+- cron jobs
+- tests
+- server startup
+
+In a Hono/Express/Fastify controller, you usually run your Effect program at the boundary.
+
+Example mental model:
+
+```ts
+const result = await runtime.runPromise(program);
+```
+
+---
+
+## 22. Effect at the Boundary
+
+A common architecture:
+
+```txt
+Controller / Route Handler
+  -> run Effect
+Use Case
+  -> compose service calls
+Service
+  -> domain logic
+Repository
+  -> database/API calls
+Layer
+  -> construct dependencies
+Runtime
+  -> execute the final program
+```
+
+Important rule:
+
+> Keep most of your app as Effect values. Run them only at the edge.
+
+Good:
+
+```ts
+const createAppointment = Effect.fn("createAppointment")(function* (input) {
+  // business logic
+});
+```
+
+Boundary:
+
+```ts
+app.post("/appointments", async (c) => {
+  const input = await c.req.json();
+  const result = await runtime.runPromise(createAppointment(input));
+  return c.json(result);
+});
+```
+
+Do not call `Effect.runPromise` deep inside your service.
+
+That breaks composability.
+
+---
+
+## 23. A Small End-to-End Example
+
+Here is a small app-style example.
+
+```ts twoslash
+import { Data, Effect, Layer, ManagedRuntime } from "effect";
+
+interface User {
+  readonly id: string;
+  readonly name: string;
+}
+
+interface Appointment {
+  readonly id: string;
+  readonly userId: string;
+  readonly status: "created";
+}
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class SlotUnavailable extends Data.TaggedError("SlotUnavailable")<{
+  readonly slotId: string;
+}> {}
+
+class UserRepository extends Effect.Service<UserRepository>()(
+  "UserRepository",
+  {
+    accessors: true,
+    sync: () => ({
+      findById: (id: string): Effect.Effect<User, UserNotFound> =>
+        id === "1"
+          ? Effect.succeed({ id, name: "Anon" })
+          : Effect.fail(new UserNotFound({ id })),
+    }),
+  },
+) {}
+
+class AppointmentRepository extends Effect.Service<AppointmentRepository>()(
+  "AppointmentRepository",
+  {
+    accessors: true,
+    sync: () => ({
+      create: (userId: string, slotId: string): Effect.Effect<Appointment> =>
+        Effect.succeed({
+          id: `appointment-${slotId}`,
+          userId,
+          status: "created",
+        }),
+    }),
+  },
+) {}
+
+class SlotService extends Effect.Service<SlotService>()("SlotService", {
+  accessors: true,
+  sync: () => ({
+    ensureAvailable: (slotId: string): Effect.Effect<void, SlotUnavailable> =>
+      slotId === "slot-1"
+        ? Effect.void
+        : Effect.fail(new SlotUnavailable({ slotId })),
+  }),
+}) {}
+
+const createAppointment = Effect.fn("createAppointment")(function* (input: {
+  readonly userId: string;
+  readonly slotId: string;
+}) {
+  const user = yield* UserRepository.findById(input.userId);
+
+  yield* SlotService.ensureAvailable(input.slotId);
+
+  const appointment = yield* AppointmentRepository.create(
+    user.id,
+    input.slotId,
+  );
+
+  return appointment;
+});
+
+const MainLayer = Layer.mergeAll(
+  UserRepository.Default,
+  AppointmentRepository.Default,
+  SlotService.Default,
+);
+
+const runtime = ManagedRuntime.make(MainLayer);
+
+const runnable = createAppointment({
+  userId: "1",
+  slotId: "slot-1",
+});
+
+runtime.runPromise(runnable);
+```
+
+Read the use case like normal TypeScript:
+
+```ts
+const user = await userRepository.findById(input.userId);
+
+await slotService.ensureAvailable(input.slotId);
+
+const appointment = await appointmentRepository.create(user.id, input.slotId);
+
+return appointment;
+```
+
+But the Effect version gives you this:
+
+```ts
+Effect.Effect<
+  Appointment,
+  UserNotFound | SlotUnavailable,
+  UserRepository | SlotService | AppointmentRepository
+>;
+```
+
+After providing `MainLayer`, the requirements disappear:
+
+```ts
+Effect.Effect<Appointment, UserNotFound | SlotUnavailable, never>;
+```
+
+That means the program is ready to run.
+
+---
+
+## 24. Mapping Errors at HTTP Boundaries
+
+Inside your app, keep errors typed.
+
+At the HTTP boundary, convert them to responses.
+
+```ts twoslash
+import { Data, Effect } from "effect";
+
+class UserNotFound extends Data.TaggedError("UserNotFound")<{
+  readonly id: string;
+}> {}
+
+class SlotUnavailable extends Data.TaggedError("SlotUnavailable")<{
+  readonly slotId: string;
+}> {}
+
+const toHttpError = (error: UserNotFound | SlotUnavailable) => {
+  switch (error._tag) {
+    case "UserNotFound":
+      return {
+        status: 404,
+        body: {
+          code: error._tag,
+          message: `User ${error.id} was not found`,
+        },
+      };
+
+    case "SlotUnavailable":
+      return {
+        status: 409,
+        body: {
+          code: error._tag,
+          message: `Slot ${error.slotId} is unavailable`,
+        },
+      };
+  }
+};
+
+declare const program: Effect.Effect<string, UserNotFound | SlotUnavailable>;
+
+const handled = program.pipe(
+  Effect.catchAll((error) => Effect.succeed(toHttpError(error))),
+);
+```
+
+This is cleaner than throwing random exceptions and hoping your global error handler understands them.
+
+---
+
+## 25. Expected Error or Defect?
+
+Use this rule:
+
+| Situation                                 | Use                                   |
+| ----------------------------------------- | ------------------------------------- |
+| User input invalid                        | Expected error                        |
+| User not found                            | Expected error                        |
+| Payment rejected                          | Expected error                        |
+| External API failed                       | Expected error                        |
+| Database unavailable                      | Expected error                        |
+| Impossible state                          | Defect                                |
+| Programming mistake                       | Defect                                |
+| Missing environment variable at startup   | Usually expected startup/config error |
+| Null where your invariant says impossible | Defect                                |
+
+Example expected error:
+
+```ts
+return yield * new UserNotFound({ id });
+```
+
+Example defect:
+
+```ts
+return yield * Effect.die("Invariant violated: appointment has no patient");
+```
+
+Do not overuse defects.
+
+If the caller can reasonably handle it, put it in the error channel.
+
+---
+
+## 26. `Effect.all`
+
+Use `Effect.all` to combine multiple effects.
+
+Sequential by default:
+
+```ts twoslash
+import { Effect } from "effect";
+
+const a = Effect.succeed(1);
+const b = Effect.succeed(2);
+
+const program = Effect.all([a, b]);
+```
+
+The result is:
+
+```ts
+Effect.Effect<[number, number], never, never>;
+```
+
+For objects:
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.all({
+  user: Effect.succeed({ id: "1", name: "Anon" }),
+  appointment: Effect.succeed({ id: "a1" }),
+});
+```
+
+Result:
+
+```ts
+Effect.Effect<
+  {
+    user: { id: string; name: string };
+    appointment: { id: string };
+  },
+  never,
+  never
+>;
+```
+
+Concurrent:
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.all(
+  {
+    user: Effect.succeed({ id: "1", name: "Anon" }),
+    appointment: Effect.succeed({ id: "a1" }),
+  },
+  { concurrency: "unbounded" },
+);
+```
+
+Use concurrency when the effects are independent.
+
+Do not use concurrency when step 2 depends on step 1.
+
+---
+
+## 27. `Effect.map`, `Effect.flatMap`, and `Effect.andThen`
+
+You will often see these three.
+
+### `map`
+
+Use when transforming a success value.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.succeed(2).pipe(Effect.map((n) => n * 10));
+```
+
+Normal JS mental model:
+
+```ts
+const result = value * 10;
+```
+
+---
+
+### `flatMap`
+
+Use when the next step returns another Effect.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const getUserId = Effect.succeed("1");
+
+const getUserName = (id: string) =>
+  Effect.succeed(id === "1" ? "Anon" : "Unknown");
+
+const program = getUserId.pipe(Effect.flatMap((id) => getUserName(id)));
+```
+
+Normal JS mental model:
+
+```ts
+const id = await getUserId();
+const name = await getUserName(id);
+```
+
+For beginner code, `Effect.gen` is usually easier to read.
+
+---
+
+### `andThen`
+
+Use when chaining to the next step.
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.succeed("1").pipe(
+  Effect.andThen((id) => Effect.succeed(`User ${id}`)),
+);
+```
+
+`Effect.gen` version:
+
+```ts twoslash
+import { Effect } from "effect";
+
+const program = Effect.gen(function* () {
+  const id = yield* Effect.succeed("1");
+  return `User ${id}`;
+});
+```
+
+Prefer the style your team finds readable.
+
+---
+
+## 28. Idiomatic Effect Code Style
+
+Based on the common Effect style and Effect Solutions guidance:
+
+### Prefer `Effect.gen` for sequential business logic
+
+Good:
+
+```ts twoslash
+import { Effect } from "effect";
+
+declare const validateInput: Effect.Effect<string>;
+declare const saveData: (value: string) => Effect.Effect<void>;
+
+const program = Effect.gen(function* () {
+  const input = yield* validateInput;
+  yield* saveData(input);
+  return input;
+});
+```
+
+Harder to read:
+
+```ts
+const program = validateInput.pipe(
+  Effect.flatMap((input) => saveData(input).pipe(Effect.map(() => input))),
+);
+```
+
+---
+
+### Prefer `Effect.fn` for named operations
+
+Good:
+
+```ts twoslash
+import { Effect } from "effect";
+
+const createUser = Effect.fn("createUser")(function* (input: {
+  readonly name: string;
+}) {
+  yield* Effect.logInfo(`Creating user ${input.name}`);
+  return {
+    id: "1",
+    name: input.name,
+  };
+});
+```
+
+This gives your operation a useful name for tracing/debugging.
+
+---
+
+### Use `.pipe()` for cross-cutting concerns
+
+Good:
+
+```ts twoslash
+import { Effect, Schedule } from "effect";
+
+declare const callExternalApi: Effect.Effect<string, Error>;
+
+const program = callExternalApi.pipe(
+  Effect.timeout("3 seconds"),
+  Effect.retry(Schedule.recurs(2)),
+  Effect.withSpan("callExternalApi"),
+);
+```
+
+This keeps business logic separate from operational policy.
+
+---
+
+### Keep dependencies in services/layers
+
+Good:
+
+```ts
+class UserRepository extends Effect.Service<UserRepository>()(
+  "UserRepository",
+  {
+    accessors: true,
+    effect: Effect.gen(function* () {
+      const db = yield* Database;
+
+      return {
+        findById: (id: string) => db.findUser(id),
+      };
+    }),
+  },
+) {}
+```
+
+Less ideal:
+
+```ts
+const findUser = (db: Database, id: string) => ...
+```
+
+That style can be okay for small helpers, but for app services, Effect’s `R` channel and layers usually scale better.
+
+---
+
+### Run Effects only at the edge
+
+Good:
+
+```ts
+const result = await runtime.runPromise(useCase(input));
+```
+
+Avoid:
+
+```ts
+const serviceMethod = async () => {
+  return Effect.runPromise(otherEffect);
+};
+```
+
+Running inside services makes composition harder.
+
+---
+
+## 29. How to Explain Effect to a JavaScript Developer
+
+### Promise
+
+```ts
+Promise<A>;
+```
+
+Means:
+
+> Eventually gives me `A`, or throws/rejects with something unknown.
+
+### Result
+
+```ts
+Result<A, E>;
+```
+
+Means:
+
+> Gives me either `A` or `E`.
+
+### Reader / Dependency Injection
+
+```ts
+(env: R) => A;
+```
+
+Means:
+
+> Give me dependencies `R`, then I can produce `A`.
+
+### Effect
+
+```ts
+Effect.Effect<A, E, R>;
+```
+
+Means:
+
+> Give me requirements `R`, then I can run a lazy computation that may fail with `E` or succeed with `A`.
+
+So Effect combines ideas from:
+
+- Promise
+- Result
+- Dependency Injection
+- Structured concurrency
+- Resource safety
+- Observability
+
+---
+
+## 30. Common Beginner Mistakes
+
+### Mistake 1: Forgetting That Effect Is Lazy
+
+```ts
+const program = Effect.sync(() => console.log("Hello"));
+```
+
+This does not print yet.
+
+You must run it:
+
+```ts
+Effect.runSync(program);
+```
+
+---
+
+### Mistake 2: Throwing Instead of Failing
+
+Avoid:
+
+```ts
+throw new Error("User not found");
+```
+
+Prefer:
+
+```ts
+return yield * new UserNotFound({ id });
+```
+
+or:
+
+```ts
+return yield * Effect.fail(new UserNotFound({ id }));
+```
+
+Use typed errors for expected failures.
+
+---
+
+### Mistake 3: Running Effects Too Early
+
+Avoid running Effects inside services.
+
+Bad:
+
+```ts
+const getUser = async (id: string) => {
+  return Effect.runPromise(UserRepository.findById(id));
+};
+```
+
+Good:
+
+```ts
+const getUser = (id: string) => UserRepository.findById(id);
+```
+
+Return Effects from your functions. Run them at the application boundary.
+
+---
+
+### Mistake 4: Catching Errors Too Early
+
+Avoid:
+
+```ts
+const program = getUser("1").pipe(Effect.catchAll(() => Effect.succeed(null)));
+```
+
+unless `null` is truly part of your domain.
+
+Usually, let the error travel upward until a meaningful boundary handles it.
+
+---
+
+### Mistake 5: Putting Construction Details in Every Method
+
+Avoid passing infrastructure everywhere manually if it is an app-level dependency.
+
+```ts
+const createUser = (db: Database, email: EmailClient, input: Input) => ...
+```
+
+Prefer services and layers when dependencies are shared across the application.
+
+---
+
+## 31. A Beginner Reading Guide
+
+When reading Effect code, ask these questions:
+
+### 1. What does it return?
+
+Look at `A`.
+
+```ts
+Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+It returns `User`.
+
+---
+
+### 2. What can go wrong?
+
+Look at `E`.
+
+```ts
+Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+It may fail with `UserNotFound`.
+
+---
+
+### 3. What does it need?
+
+Look at `R`.
+
+```ts
+Effect.Effect<User, UserNotFound, UserRepository>;
+```
+
+It needs `UserRepository`.
+
+---
+
+### 4. Is it already runnable?
+
+If `R` is `never`, it is runnable.
+
+```ts
+Effect.Effect<User, UserNotFound, never>;
+```
+
+If `R` is not `never`, you need to provide dependencies.
+
+```ts
+program.pipe(Effect.provide(MainLayer));
+```
+
+---
+
+### 5. Where does it run?
+
+Find:
+
+```ts
+Effect.runPromise(...)
+Effect.runSync(...)
+runtime.runPromise(...)
+runtime.runSync(...)
+```
+
+That is the boundary where the lazy description becomes real execution.
+
+---
+
+## 32. Recommended Learning Order
+
+Learn Effect in this order:
+
+1. `Effect.Effect<A, E, R>`
+2. `Effect.succeed`, `Effect.fail`, `Effect.sync`
+3. `Effect.tryPromise`
+4. `Effect.gen`
+5. `.pipe()`
+6. `Data.TaggedError`
+7. `catchTag`, `catchAll`
+8. `Effect.fn`
+9. `Effect.Service`
+10. `Layer`
+11. `Effect.provide`
+12. `ManagedRuntime`
+13. Logging/tracing/retry/timeout
+14. Resource management and scopes
+15. Concurrency and fibers
+
+Do not start with advanced concepts like fibers, scopes, supervisors, or custom runtimes.
+
+Start with:
+
+> How do I read this like normal TypeScript?
+
+---
+
+## 33. Final Mental Model
+
+Effect is not just an error-handling library.
+
+Effect is an application framework.
+
+The core type:
+
+```ts
+Effect.Effect<A, E, R>;
+```
+
+means:
+
+> A lazy computation that needs `R`, may fail with `E`, and may succeed with `A`.
+
+`Effect.gen` lets you write it like `async/await`.
+
+`Effect.fn` gives names and tracing to important operations.
+
+`.pipe()` lets you add behavior like retry, timeout, logging, and error handling.
+
+`Data.TaggedError` gives you typed domain errors.
+
+`Effect.Service` defines dependencies.
+
+`Layer` builds dependencies.
+
+`Effect.provide` gives dependencies to programs.
+
+`ManagedRuntime` runs your app with a prepared dependency graph.
+
+Once you understand this, most Effect code becomes readable:
+
+```ts
+const program = Effect.gen(function* () {
+  const user = yield* UserRepository.findById("1");
+  yield* Effect.logInfo(`Found user ${user.name}`);
+  return user;
+}).pipe(Effect.provide(UserRepository.Default));
+```
+
+Read it as:
+
+> Find a user, log it, return it, and provide the repository needed to run.
+
+That is Effect 101.
+
+---
+
+## References
+
+- Effect Documentation: Why Effect?
+- Effect Documentation: Creating Effects
+- Effect Documentation: Expected Errors
+- Effect Documentation: Data.TaggedError
+- Effect Documentation: Managing Services
+- Effect Documentation: Managing Layers
+- Effect Documentation: Runtime and ManagedRuntime
+- Effect Solutions: Basics
+- Effect Solutions: Services & Layers
+- Effect Solutions: Error Handling

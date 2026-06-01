@@ -1,0 +1,32 @@
+<button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle color theme">
+  Theme
+</button>
+
+<script>
+  const storageKey = "theme"
+  const root = document.documentElement
+  const button = document.getElementById("theme-toggle")
+
+  const applyTheme = (theme) => {
+    root.dataset.theme = theme
+  }
+
+  const getTheme = () => {
+    const stored = localStorage.getItem(storageKey)
+    if (stored === "light" || stored === "dark") return stored
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+  }
+
+  let theme = getTheme()
+  applyTheme(theme)
+
+  if (button) {
+    button.textContent = theme === "dark" ? "Dark" : "Light"
+    button.addEventListener("click", () => {
+      theme = theme === "dark" ? "light" : "dark"
+      localStorage.setItem(storageKey, theme)
+      applyTheme(theme)
+      button.textContent = theme === "dark" ? "Dark" : "Light"
+    })
+  }
+</script>
