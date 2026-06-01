@@ -70,7 +70,7 @@ Loaded appointment for John
 The mental model is honestly easier than it looks. Read this:
 
 ```ts id="read-yield"
-const user = yield* getUser()
+const user = yield * getUser()
 ```
 
 exactly like this:
@@ -505,6 +505,9 @@ const getAppointmentForUser = Effect.fn("getAppointmentForUser")(function* (
   return appointment
 })
 
+getAppointmentForUser
+// ^?
+
 const program = getAppointmentForUser("user_1")
 
 Effect.runPromise(program).then(console.log)
@@ -683,6 +686,8 @@ Here's my beginner decision matrix:
 | Adding retry/timeout                 | `.pipe()`    |
 | Layer building                       | `.pipe()`    |
 | Simple transforms                    | `.pipe()`    |
+
+[Thanks to Dillon](https://x.com/dillon_mulroy/status/1936530534936486009?s=20)
 
 ---
 
@@ -992,3 +997,15 @@ Once that clicks, Effect stops being scary. It was never a secret language, it's
 | Layer composition                                     | `Layer.mergeAll(...)` / `Layer.provide(...)`    | Build the dependency graph                                      |
 | App container                                         | `ManagedRuntime`                                | Runtime with your dependency graph already provided             |
 | Run the app                                           | `runtime.runPromise(program)`                   | Execute the lazy program at the application edge                |
+
+---
+
+## Where to Go Next
+
+If this got the patterns to click, here are the resources I'd point you to for going deeper.
+
+- **[Visual Effect](https://effect.kitlangton.com/)** — Interactive animations that make fibers, retries, and concurrency easier.
+- **[Effect Institute](https://www.effect.institute/)** — Short, semi-interactive lessons for learning Effect fundamentals.
+- **[Effect Solutions](https://www.effect.solutions/)** — Opinionated guide to structuring real-world Effect projects.
+- **[Effect Docs](https://effect.website/docs)** — Official reference from basics to advanced topics.
+- **[Effect Playground](https://effect.website/play/)** — Run and tweak Effect snippets instantly in your browser.
