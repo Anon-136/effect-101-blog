@@ -1,14 +1,14 @@
 ---
-title: "Effect 101"
+title: "Effect 101: How to Read Effect Code"
 description: "Learning Effect like normal TypeScript"
 pubDate: 2026-05-31
 tags: ["effect", "typescript"]
 draft: false
 ---
 
-# Reading Effect Without the Fear
+# Effect 101: How to Read Effect Code
 
-People often say Effect has a steep learning curve, and I get it. When you first see `Effect.gen`, `yield*`, `Layer`, `Runtime`, `Data.TaggedError`, and services everywhere, it can feel like Effect is trying to replace TypeScript with a secret language. But that's not the right way to read it. Effect code is still TypeScript code, the trick is just learning how to read it. Let me show you.
+People often say [Effect.ts](https://effect.website/) has a steep learning curve, and I get it. When you first see `Effect.gen`, `yield*`, `Layer`, `Runtime`, `Data.TaggedError`, and services everywhere, it can feel like Effect is trying to replace TypeScript with a secret language. But that's not the right way to read it. Effect code is still TypeScript code, the trick is just learning how to read it. Let me show you.
 
 ---
 
@@ -16,7 +16,7 @@ People often say Effect has a steep learning curve, and I get it. When you first
 
 This is the first piece of Effect code you should learn to read.
 
-```ts twoslash id="start-effect-gen" collapse={1-29}
+```ts twoslash id="start-effect-gen" collapse={1-30}
 import { Effect } from "effect"
 
 interface User {
@@ -79,11 +79,13 @@ const user = await getUser()
 
 Inside `Effect.gen`, the line `yield* someEffect` means:
 
-> Run this Effect step. If it succeeds, give me the success value. If it fails, stop the whole program with that failure.
+> Run this Effect step. \
+> If it succeeds, give me the success value. \
+> If it fails, stop the whole program with that failure.
 
 The Effect version above is basically the same story as this normal TypeScript:
 
-```ts twoslash id="async-await-shape" collapse={1-21}
+```ts twoslash id="async-await-shape" collapse={1-22}
 interface User {
   readonly id: string
   readonly name: string
@@ -221,7 +223,9 @@ Output:
 Notice that we never annotated the return type, we let Effect infer it. Hover `program` in your editor and you get the whole story: `Effect<Appointment, BookingLookupError, never>`.
 Read it as:
 
-> This program succeeds with an `Appointment`, may fail with `BookingLookupError`, and needs no dependencies.
+> This program succeeds with an `Appointment`, \
+> may fail with `BookingLookupError`, \
+> and needs no dependencies.
 
 For contrast, here's the same idea written the old way, with `try/catch`:
 
@@ -312,7 +316,7 @@ Output:
 */
 ```
 
-This is the real value of Effect. Where normal TypeScript would only say: `Promise<Appointment>` Effect tells you more: `Effect<Appointment, BookingLookupError, never>`
+This is the real value of Effect. Where normal TypeScript would only say: `Promise<Appointment>` Effect tells you more: `Effect<Appointment, BookingLookupError, never>`.
 The failure isn't hidden, it's part of the type.
 
 ---
@@ -341,8 +345,8 @@ Because `Effect.gen` is where you only describe **computation**.
 It is not where you receive business arguments.
 A useful way to think about it is:
 
-> An `Effect` is a lazy computation.
-> It describes what should happen later.
+> An `Effect` is a lazy computation. \
+> It describes what should happen later. \
 > It does not run immediately.
 
 So this:
@@ -355,7 +359,7 @@ const program = Effect.gen(function* () {
 
 means:
 
-> Here is a lazy program.
+> Here is a lazy program. \
 > When someone runs it later, it will produce `42`.
 
 `program` is not a function.
@@ -670,8 +674,6 @@ Here's my beginner decision matrix:
 | Adding retry/timeout                 | `.pipe()`    |
 | Layer building                       | `.pipe()`    |
 | Simple transforms                    | `.pipe()`    |
-
-Easy as that.
 
 ---
 
