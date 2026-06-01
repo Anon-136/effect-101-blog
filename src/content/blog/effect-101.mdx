@@ -16,43 +16,51 @@ People often say Effect has a steep learning curve, and I get it. When you first
 
 This is the first piece of Effect code you should learn to read.
 
-```ts twoslash id="start-effect-gen" collapse={1-25}
-import { Effect } from "effect";
+```ts twoslash id="start-effect-gen" collapse={1-34}
+import { Effect } from "effect"
 
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 interface Appointment {
-  readonly id: string;
-  readonly userId: string;
-  readonly status: "booked";
+  readonly id: string
+  readonly userId: string
+  readonly status: "booked"
 }
 
 const getUser = () =>
-  Effect.succeed<User>({
-    id: "user_1",
-    name: "John",
-  });
+  Effect.gen(function* () {
+    const user: User = {
+      id: "user_1",
+      name: "John",
+    }
+
+    return user
+  })
 
 const getAppointment = () =>
-  Effect.succeed<Appointment>({
-    id: "appointment_1",
-    userId: "user_1",
-    status: "booked",
-  });
+  Effect.gen(function* () {
+    const appointment: Appointment = {
+      id: "appointment_1",
+      userId: "user_1",
+      status: "booked",
+    }
+
+    return appointment
+  })
 
 const program = Effect.gen(function* () {
-  const user = yield* getUser();
-  const appointment = yield* getAppointment();
+  const user = yield* getUser()
+  const appointment = yield* getAppointment()
 
-  console.log(`Loaded appointment for ${user.name}`);
+  console.log(`Loaded appointment for ${user.name}`)
 
-  return appointment;
-});
+  return appointment
+})
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -61,56 +69,57 @@ Loaded appointment for John
 */
 ```
 
-The mental model is simple: read `const user = yield* getUser()` exactly like `const user = await getUser()`. Inside `Effect.gen`, the line `yield* someEffect` means:
+The mental model is simple. Read this:
+
+```ts id="read-yield"
+const user = yield * getUser()
+```
+
+exactly like this:
+
+```ts id="read-await"
+const user = await getUser()
+```
+
+Inside `Effect.gen`, the line `yield* someEffect` means:
 
 > Run this Effect step. If it succeeds, give me the success value. If it fails, stop the whole program with that failure.
 
-So the Effect version:
-
-```ts id="effect-gen-shape"
-const program = Effect.gen(function* () {
-  const user = yield* getUser();
-  const appointment = yield* getAppointment();
-
-  return appointment;
-});
-```
-
-is basically the same story as this normal TypeScript:
+The Effect version above is basically the same story as this normal TypeScript:
 
 ```ts id="async-await-shape" collapse={1-21}
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 interface Appointment {
-  readonly id: string;
-  readonly userId: string;
-  readonly status: "booked";
+  readonly id: string
+  readonly userId: string
+  readonly status: "booked"
 }
 
 const getUser = async (): Promise<User> => ({
   id: "user_1",
   name: "John",
-});
+})
 
 const getAppointment = async (): Promise<Appointment> => ({
   id: "appointment_1",
   userId: "user_1",
   status: "booked",
-});
+})
 
 async function program(): Promise<Appointment> {
-  const user = await getUser();
-  const appointment = await getAppointment();
+  const user = await getUser()
+  const appointment = await getAppointment()
 
-  console.log(`Loaded appointment for ${user.name}`);
+  console.log(`Loaded appointment for ${user.name}`)
 
-  return appointment;
+  return appointment
 }
 
-program().then(console.log);
+program().then(console.log)
 
 /*
 Output:
@@ -128,63 +137,63 @@ The shape is identical. Effect isn't asking you to forget `async/await`, it's gi
 Now let's make the example more realistic. We'll model a flow that finds a user, finds their appointment, returns it, and converts any failure into a single domain error. No dependency injection or service layers yet, just `Effect.gen`, `Data.TaggedError`, and error handling.
 
 ```ts twoslash id="concrete-error-handling" collapse={1-51}
-import { Data, Effect } from "effect";
+import { Data, Effect } from "effect"
 
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 interface Appointment {
-  readonly id: string;
-  readonly userId: string;
-  readonly status: "booked" | "cancelled";
+  readonly id: string
+  readonly userId: string
+  readonly status: "booked" | "cancelled"
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class BookingLookupError extends Data.TaggedError("BookingLookupError")<{
-  readonly message: string;
-  readonly cause: UserNotFound | AppointmentNotFound;
+  readonly message: string
+  readonly cause: UserNotFound | AppointmentNotFound
 }> {}
 
 const getUser = (userId: string) =>
   Effect.gen(function* () {
     if (userId !== "user_1") {
-      return yield* new UserNotFound({ userId });
+      return yield* new UserNotFound({ userId })
     }
 
     return {
       id: "user_1",
       name: "John",
-    };
-  });
+    }
+  })
 
 const getAppointment = (userId: string) =>
   Effect.gen(function* () {
     if (userId !== "user_1") {
-      return yield* new AppointmentNotFound({ userId });
+      return yield* new AppointmentNotFound({ userId })
     }
 
     return {
       id: "appointment_1",
       userId,
       status: "booked" as const,
-    };
-  });
+    }
+  })
 
 const getUserAppointment = (userId: string) =>
   Effect.gen(function* () {
-    const user = yield* getUser(userId);
-    const appointment = yield* getAppointment(user.id);
+    const user = yield* getUser(userId)
+    const appointment = yield* getAppointment(user.id)
 
-    return appointment;
+    return appointment
   }).pipe(
     Effect.mapError((error) => {
       switch (error._tag) {
@@ -192,23 +201,23 @@ const getUserAppointment = (userId: string) =>
           return new BookingLookupError({
             message: `Cannot find user ${error.userId}`,
             cause: error,
-          });
+          })
 
         case "AppointmentNotFound":
           return new BookingLookupError({
             message: `Cannot find appointment for user ${error.userId}`,
             cause: error,
-          });
+          })
       }
     }),
-  );
+  )
 
-const program = getUserAppointment("user_1");
+const program = getUserAppointment("user_1")
 
-program;
+program
 // ^?
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -216,11 +225,7 @@ Output:
 */
 ```
 
-Notice that we never annotated the return type, we let Effect infer it. If you hover `program` in your editor, you get the whole story:
-
-```ts id="program-hover"
-Effect<Appointment, BookingLookupError, never>;
-```
+Notice that we never annotated the return type, we let Effect infer it. Hover `program` in your editor (the `// ^?` marker above shows it) and you get the whole story: `Effect<Appointment, BookingLookupError, never>`.
 
 Read it as:
 
@@ -229,44 +234,40 @@ Read it as:
 This is the real value of Effect. Where normal TypeScript would only say:
 
 ```ts id="promise-appointment"
-Promise<Appointment>;
+Promise<Appointment>
 ```
 
 Effect tells you more:
 
 ```ts id="effect-appointment"
-Effect<Appointment, BookingLookupError, never>;
+Effect<Appointment, BookingLookupError, never>
 ```
 
 The failure isn't hidden, it's part of the type.
 
----
-
-## The Old `try/catch` Way
-
-Here's the same idea using normal TypeScript.
+For contrast, here's the same idea written the old way, with `try/catch`:
 
 ```ts id="normal-try-catch-throw" collapse={1-55}
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 interface Appointment {
-  readonly id: string;
-  readonly userId: string;
-  readonly status: "booked" | "cancelled";
+  readonly id: string
+  readonly userId: string
+  readonly status: "booked" | "cancelled"
 }
 
 class UserNotFound extends Error {
   constructor(readonly userId: string) {
-    super(`User not found: ${userId}`);
+    super(`User not found: ${userId}`)
   }
 }
 
 class AppointmentNotFound extends Error {
   constructor(readonly userId: string) {
-    super(`Appointment not found for user: ${userId}`);
+    super(`Appointment not found for user: ${userId}`)
   }
 }
 
@@ -275,56 +276,56 @@ class BookingLookupError extends Error {
     readonly message: string,
     readonly cause: unknown,
   ) {
-    super(message);
+    super(message)
   }
 }
 
 async function getUser(userId: string): Promise<User> {
   if (userId !== "user_1") {
-    throw new UserNotFound(userId);
+    throw new UserNotFound(userId)
   }
 
   return {
     id: "user_1",
     name: "John",
-  };
+  }
 }
 
 async function getAppointment(userId: string): Promise<Appointment> {
   if (userId !== "user_1") {
-    throw new AppointmentNotFound(userId);
+    throw new AppointmentNotFound(userId)
   }
 
   return {
     id: "appointment_1",
     userId,
     status: "booked",
-  };
+  }
 }
 
 async function getUserAppointment(userId: string): Promise<Appointment> {
   try {
-    const user = await getUser(userId);
-    const appointment = await getAppointment(user.id);
+    const user = await getUser(userId)
+    const appointment = await getAppointment(user.id)
 
-    return appointment;
+    return appointment
   } catch (error) {
     if (error instanceof UserNotFound) {
-      throw new BookingLookupError(`Cannot find user ${error.userId}`, error);
+      throw new BookingLookupError(`Cannot find user ${error.userId}`, error)
     }
 
     if (error instanceof AppointmentNotFound) {
       throw new BookingLookupError(
         `Cannot find appointment for user ${error.userId}`,
         error,
-      );
+      )
     }
 
-    throw error;
+    throw error
   }
 }
 
-getUserAppointment("user_1").then(console.log);
+getUserAppointment("user_1").then(console.log)
 
 /*
 Output:
@@ -335,7 +336,7 @@ Output:
 This works, but the type still only says:
 
 ```ts id="hidden-promise-type"
-Promise<Appointment>;
+Promise<Appointment>
 ```
 
 The possible failures are invisible. With Effect, the failure lives in the type. That's why Effect can feel more verbose at first, it isn't adding complexity for no reason, it's moving hidden runtime behavior into the type system.
@@ -358,35 +359,35 @@ Effect.gen(function* () {
 Here's a fuller example:
 
 ```ts twoslash id="gen-for-logic-pipe-for-composition" collapse={1-42}
-import { Data, Duration, Effect, Schedule } from "effect";
+import { Data, Duration, Effect, Schedule } from "effect"
 
 interface Post {
-  readonly id: string;
-  readonly title: string;
+  readonly id: string
+  readonly title: string
 }
 
 class DatabaseError extends Data.TaggedError("DatabaseError")<{
-  readonly cause: unknown;
+  readonly cause: unknown
 }> {}
 
-const store = new Map<string, ReadonlyArray<Post>>();
+const store = new Map<string, ReadonlyArray<Post>>()
 
 const cacheGet = (key: string) =>
   Effect.gen(function* () {
-    return store.get(key);
-  });
+    return store.get(key)
+  })
 
 const cacheSet = (key: string, value: ReadonlyArray<Post>) =>
   Effect.gen(function* () {
-    store.set(key, value);
-  });
+    store.set(key, value)
+  })
 
 const findPostsByUser = (userId: string) =>
   Effect.gen(function* () {
     if (userId === "broken") {
       return yield* new DatabaseError({
         cause: "database unavailable",
-      });
+      })
     }
 
     return [
@@ -394,37 +395,37 @@ const findPostsByUser = (userId: string) =>
         id: `post_${userId}`,
         title: "Effect makes hidden things visible",
       },
-    ];
-  });
+    ]
+  })
 
 const retryPolicy = Schedule.recurs(2).pipe(
   Schedule.addDelay(() => Duration.millis(100)),
-);
+)
 
 const fetchUserPosts = (userId: string) =>
   Effect.gen(function* () {
-    const cacheKey = `posts:${userId}`;
+    const cacheKey = `posts:${userId}`
 
-    const cached = yield* cacheGet(cacheKey);
+    const cached = yield* cacheGet(cacheKey)
 
     if (cached) {
-      return cached;
+      return cached
     }
 
-    const posts = yield* findPostsByUser(userId);
+    const posts = yield* findPostsByUser(userId)
 
-    yield* cacheSet(cacheKey, posts);
+    yield* cacheSet(cacheKey, posts)
 
-    return posts;
+    return posts
   }).pipe(
     Effect.withSpan("fetch_user_posts"),
     Effect.retry(retryPolicy),
     Effect.catchTag("DatabaseError", () => Effect.succeed([])),
-  );
+  )
 
-const program = fetchUserPosts("user_1");
+const program = fetchUserPosts("user_1")
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -452,75 +453,75 @@ Effect.succeed(order).pipe(
   Effect.andThen(applyDiscounts),
   Effect.andThen(processPayment),
   Effect.andThen(sendConfirmation),
-);
+)
 ```
 
 It isn't wrong, but the moment you add conditionals, intermediate names, logs, or branching, this style becomes hard to scan. For sequential business logic, prefer this:
 
 ```ts twoslash id="prefer-gen-over-too-much-pipe" collapse={1-53}
-import { Effect } from "effect";
+import { Effect } from "effect"
 
 interface Order {
-  readonly id: string;
-  readonly total: number;
+  readonly id: string
+  readonly total: number
 }
 
 interface Payment {
-  readonly orderId: string;
-  readonly paid: true;
+  readonly orderId: string
+  readonly paid: true
 }
 
 const order: Order = {
   id: "order_1",
   total: 100,
-};
+}
 
 const validateOrder = (order: Order) =>
   Effect.gen(function* () {
-    return order;
-  });
+    return order
+  })
 
 const calculateTotals = (order: Order) =>
   Effect.gen(function* () {
     return {
       ...order,
       total: order.total + 10,
-    };
-  });
+    }
+  })
 
 const applyDiscounts = (order: Order) =>
   Effect.gen(function* () {
     return {
       ...order,
       total: order.total - 20,
-    };
-  });
+    }
+  })
 
 const processPayment = (order: Order) =>
   Effect.gen(function* () {
     return {
       orderId: order.id,
       paid: true as const,
-    };
-  });
+    }
+  })
 
 const sendConfirmation = (payment: Payment) =>
   Effect.gen(function* () {
-    console.log(`Confirmation sent for ${payment.orderId}`);
+    console.log(`Confirmation sent for ${payment.orderId}`)
 
-    return payment;
-  });
+    return payment
+  })
 
 const program = Effect.gen(function* () {
-  const validated = yield* validateOrder(order);
-  const withTotals = yield* calculateTotals(validated);
-  const discounted = yield* applyDiscounts(withTotals);
-  const payment = yield* processPayment(discounted);
+  const validated = yield* validateOrder(order)
+  const withTotals = yield* calculateTotals(validated)
+  const discounted = yield* applyDiscounts(withTotals)
+  const payment = yield* processPayment(discounted)
 
-  return yield* sendConfirmation(payment);
-});
+  return yield* sendConfirmation(payment)
+})
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -546,14 +547,14 @@ Easy as that.
 
 ---
 
-## Wait, Why Does `Effect.gen` Take No Arguments?
+## Arguments, and How `Effect.fn` Names Them
 
 This confuses a lot of beginners. You usually write:
 
 ```ts id="effect-gen-no-args-shape"
 const program = Effect.gen(function* () {
   // ...
-});
+})
 ```
 
 Not:
@@ -561,19 +562,19 @@ Not:
 ```ts id="effect-gen-with-args-wrong-shape"
 const program = Effect.gen(function* (userId: string) {
   // ...
-});
+})
 ```
 
 Why? Because `Effect.gen` creates one lazy program, it isn't a function factory by itself. So this:
 
 ```ts twoslash id="effect-gen-no-args"
-import { Effect } from "effect";
+import { Effect } from "effect"
 
 const program = Effect.gen(function* () {
-  return 123;
-});
+  return 123
+})
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -588,16 +589,16 @@ means:
 If you need arguments, just wrap it in a normal function that returns an Effect:
 
 ```ts twoslash id="normal-function-returning-effect"
-import { Effect } from "effect";
+import { Effect } from "effect"
 
 const greet = (name: string) =>
   Effect.gen(function* () {
-    return `Hello, ${name}`;
-  });
+    return `Hello, ${name}`
+  })
 
-const program = greet("John");
+const program = greet("John")
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -605,71 +606,65 @@ Hello, John
 */
 ```
 
-That's fine, but for named business operations, prefer `Effect.fn`.
-
----
-
-## `Effect.fn`: Give Your Functions a Name
-
-`Effect.fn` creates named functions that return Effects. Its arguments should be normal business inputs like `userId`, `appointmentId`, `order`, `paymentInput`, `command`, or `query`, while dependencies usually stay in the requirement channel.
+That's fine, but for named business operations, prefer `Effect.fn`. It creates named functions that return Effects, and its arguments should be normal business inputs like `userId`, `appointmentId`, `order`, `paymentInput`, `command`, or `query`, while dependencies usually stay in the requirement channel.
 
 ```ts twoslash id="effect-fn-example" collapse={1-44}
-import { Data, Effect } from "effect";
+import { Data, Effect } from "effect"
 
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 interface Appointment {
-  readonly id: string;
-  readonly userId: string;
+  readonly id: string
+  readonly userId: string
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 const getUser = (userId: string) =>
   Effect.gen(function* () {
     if (userId !== "user_1") {
-      return yield* new UserNotFound({ userId });
+      return yield* new UserNotFound({ userId })
     }
 
     return {
       id: userId,
       name: "John",
-    };
-  });
+    }
+  })
 
 const getAppointment = (userId: string) =>
   Effect.gen(function* () {
     if (userId !== "user_1") {
-      return yield* new AppointmentNotFound({ userId });
+      return yield* new AppointmentNotFound({ userId })
     }
 
     return {
       id: "appointment_1",
       userId,
-    };
-  });
+    }
+  })
 
 const getAppointmentForUser = Effect.fn("getAppointmentForUser")(function* (
   userId: string,
 ) {
-  const user = yield* getUser(userId);
-  const appointment = yield* getAppointment(user.id);
+  const user = yield* getUser(userId)
+  const appointment = yield* getAppointment(user.id)
 
-  return appointment;
-});
+  return appointment
+})
 
-const program = getAppointmentForUser("user_1");
+const program = getAppointmentForUser("user_1")
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -684,7 +679,7 @@ const getAppointmentForUser = Effect.fn("getAppointmentForUser")(function* (
   userId: string,
 ) {
   // ...
-});
+})
 ```
 
 as:
@@ -713,41 +708,45 @@ Failure means "this is a normal error that can happen, and I want it tracked." D
 
 Use `Data.TaggedError` for expected domain errors. Inside `Effect.gen`, tagged errors are yieldable.
 
-```ts twoslash id="failure-channel-example" collapse={1-14}
-import { Data, Effect } from "effect";
+```ts twoslash id="failure-channel-example" collapse={1-6}
+import { Data, Effect } from "effect"
 
 class InsufficientFunds extends Data.TaggedError("InsufficientFunds")<{
-  readonly balance: number;
-  readonly required: number;
+  readonly balance: number
+  readonly required: number
 }> {}
 
-const chargeCard = () =>
+const chargeCard = (balance: number) =>
   Effect.gen(function* () {
-    return yield* new InsufficientFunds({
-      balance: 50,
-      required: 100,
-    });
-  });
+    const required = 100
 
-const program = Effect.gen(function* () {
-  return yield* chargeCard();
-}).pipe(
-  Effect.catchAll((error) =>
-    Effect.succeed(
-      `Payment failed: required ${error.required}, balance ${error.balance}`,
+    if (balance < required) {
+      return yield* new InsufficientFunds({ balance, required })
+    }
+
+    return `Payment success: charged ${required}, balance ${balance}`
+  })
+
+const program = (balance: number) =>
+  chargeCard(balance).pipe(
+    Effect.catchAll((error) =>
+      Effect.succeed(
+        `Payment failed: required ${error.required}, balance ${error.balance}`,
+      ),
     ),
-  ),
-);
+  )
 
-Effect.runPromise(program).then(console.log);
+Effect.runPromise(program(50)).then(console.log)
+Effect.runPromise(program(150)).then(console.log)
 
 /*
 Output:
 Payment failed: required 100, balance 50
+Payment success: charged 100, balance 150
 */
 ```
 
-The failure is tracked: before `catchAll`, the program may fail with `InsufficientFunds`, and after `catchAll`, the error is handled.
+The failure is tracked: before `catchAll`, the program may fail with `InsufficientFunds`, and after `catchAll`, the error is handled, so a low balance becomes a failure message while a sufficient one succeeds.
 
 ---
 
@@ -756,22 +755,22 @@ The failure is tracked: before `catchAll`, the program may fail with `Insufficie
 Use `Effect.die` for bugs or impossible states.
 
 ```ts twoslash id="defect-channel-example"
-import { Effect } from "effect";
+import { Effect } from "effect"
 
 const processPayment = (total: number) =>
   Effect.gen(function* () {
     if (total < 0) {
-      return yield* Effect.die("Invariant violated: payment total is negative");
+      return yield* Effect.die("Invariant violated: payment total is negative")
     }
 
     return {
       paid: true as const,
-    };
-  });
+    }
+  })
 
-const program = processPayment(-1);
+const program = processPayment(-1)
 
-Effect.runPromiseExit(program).then(console.log);
+Effect.runPromiseExit(program).then(console.log)
 
 /*
 Output:
@@ -779,158 +778,7 @@ Exit.fail(...Cause.die...)
 */
 ```
 
-A defect isn't a normal business failure, it means something is wrong with the program itself, things like an impossible state, corrupted data, a programming mistake, an unexpected null, or a broken invariant. Importantly, this:
-
-```ts id="catch-all-does-not-catch-defect"
-Effect.catchAll(...)
-```
-
-catches expected failures but does not handle defects like normal business errors. That's a good thing, you usually don't want to recover from bugs inside your domain flow.
-
----
-
-## When Things Throw
-
-In normal JavaScript, anything can throw.
-
-```ts id="throw-boom"
-throw new Error("Boom");
-```
-
-In Effect, throwing inside Effect code is usually treated as an unexpected defect unless you deliberately capture it. Use `Effect.try` or `Effect.tryPromise` when you want to convert thrown or rejected errors into the failure channel.
-
-```ts twoslash id="try-convert-throw-to-failure" collapse={1-5}
-import { Data, Effect } from "effect";
-
-class ParseError extends Data.TaggedError("ParseError")<{
-  readonly cause: unknown;
-}> {}
-
-const parseJson = (input: string) =>
-  Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => JSON.parse(input) as unknown,
-      catch: (cause) => new ParseError({ cause }),
-    });
-  });
-
-const program = Effect.gen(function* () {
-  const value = yield* parseJson("{ bad json }");
-
-  return value;
-}).pipe(
-  Effect.catchAll((error) => {
-    switch (error._tag) {
-      case "ParseError":
-        return Effect.succeed("Invalid JSON");
-    }
-  }),
-);
-
-Effect.runPromise(program).then(console.log);
-
-/*
-Output:
-Invalid JSON
-*/
-```
-
-The normal TypeScript version:
-
-```ts id="normal-parse-json"
-function parseJson(input: string): unknown {
-  try {
-    return JSON.parse(input);
-  } catch {
-    return "Invalid JSON";
-  }
-}
-
-console.log(parseJson("{ bad json }"));
-
-/*
-Output:
-Invalid JSON
-*/
-```
-
-This works, but its type only says:
-
-```ts id="unknown-type"
-unknown;
-```
-
-The Effect version tracks the `ParseError` before you handle it. Again, Effect makes the invisible part visible.
-
----
-
-## Catching Errors with `catchAll` and `switch`
-
-Use `catchAll` when you want to handle every expected error in the failure channel.
-
-```ts twoslash id="catch-all-switch-example" collapse={1-36}
-import { Data, Effect } from "effect";
-
-interface User {
-  readonly id: string;
-  readonly name: string;
-}
-
-class UserNotFound extends Data.TaggedError("UserNotFound")<{
-  readonly userId: string;
-}> {}
-
-class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly appointmentId: string;
-}> {}
-
-const getUser = (userId: string) =>
-  Effect.gen(function* () {
-    if (userId !== "user_1") {
-      return yield* new UserNotFound({ userId });
-    }
-
-    return {
-      id: userId,
-      name: "John",
-    };
-  });
-
-const getAppointment = (appointmentId: string) =>
-  Effect.gen(function* () {
-    if (appointmentId !== "appointment_1") {
-      return yield* new AppointmentNotFound({ appointmentId });
-    }
-
-    return "Appointment found";
-  });
-
-const program = Effect.gen(function* () {
-  const user = yield* getUser("user_1");
-  const appointment = yield* getAppointment("missing");
-
-  return `${appointment} for ${user.name}`;
-}).pipe(
-  Effect.catchAll((error) => {
-    switch (error._tag) {
-      case "UserNotFound":
-        return Effect.succeed(`User missing: ${error.userId}`);
-
-      case "AppointmentNotFound":
-        return Effect.succeed(`Appointment missing: ${error.appointmentId}`);
-    }
-  }),
-);
-
-Effect.runPromise(program).then(console.log);
-
-/*
-Output:
-Appointment missing: missing
-*/
-```
-
-Here's a major difference: normal `try/catch` catches thrown values, while Effect's `catchAll` catches typed, expected failures.
+A defect isn't a normal business failure, it means something is wrong with the program itself, things like an impossible state, corrupted data, a programming mistake, an unexpected null, or a broken invariant. Importantly, `Effect.catchAll(...)` catches expected failures but does not handle defects like normal business errors. That's a good thing, you usually don't want to recover from bugs inside your domain flow.
 
 ---
 
@@ -947,46 +795,46 @@ class UserService {
 In Effect, dependencies can live in the requirement channel, so you don't have to manually thread them through every function. Here's a small example.
 
 ```ts twoslash id="dependency-injection-requirement-channel" collapse={1-10}
-import { Data, Effect } from "effect";
+import { Data, Effect } from "effect"
 
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class UserService extends Effect.Service<UserService>()("UserService", {
   accessors: true,
-  sync: () => ({
+  effect: Effect.sync(() => ({
     getById: (userId: string) =>
       Effect.gen(function* () {
         if (userId !== "user_1") {
-          return yield* new UserNotFound({ userId });
+          return yield* new UserNotFound({ userId })
         }
 
         return {
           id: userId,
           name: "John",
-        };
+        }
       }),
-  }),
+  })),
 }) {}
 
 const program = Effect.gen(function* () {
-  const user = yield* UserService.getById("user_1");
+  const user = yield* UserService.getById("user_1")
 
-  return user.name;
-});
+  return user.name
+})
 
-program;
+program
 // ^?
 
-const runnable = program.pipe(Effect.provide(UserService.Default));
+const runnable = program.pipe(Effect.provide(UserService.Default))
 
-Effect.runPromise(runnable).then(console.log);
+Effect.runPromise(runnable).then(console.log)
 
 /*
 Output:
@@ -997,7 +845,7 @@ John
 Before providing the service, the program needs `UserService`. After this:
 
 ```ts id="provide-user-service"
-program.pipe(Effect.provide(UserService.Default));
+program.pipe(Effect.provide(UserService.Default))
 ```
 
 the requirement is gone and the program is ready to run. That's dependency injection in Effect, the dependency isn't passed as a function argument, it's tracked by Effect itself.
@@ -1009,47 +857,47 @@ the requirement is gone and the program is ready to run. That's dependency injec
 You can't run a program that still needs requirements, so you provide them first. For small examples, this is fine:
 
 ```ts id="effect-provide-small-example"
-program.pipe(Effect.provide(UserService.Default));
+program.pipe(Effect.provide(UserService.Default))
 ```
 
 For real applications, prefer creating a runtime once.
 
 ```ts twoslash id="managed-runtime-example" collapse={1-28}
-import { Data, Effect, ManagedRuntime } from "effect";
+import { Data, Effect, ManagedRuntime } from "effect"
 
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class UserService extends Effect.Service<UserService>()("UserService", {
   accessors: true,
-  sync: () => ({
+  effect: Effect.sync(() => ({
     getById: (userId: string) =>
       Effect.gen(function* () {
         if (userId !== "user_1") {
-          return yield* new UserNotFound({ userId });
+          return yield* new UserNotFound({ userId })
         }
 
         return {
           id: userId,
           name: "John",
-        };
+        }
       }),
-  }),
+  })),
 }) {}
 
 const program = Effect.gen(function* () {
-  return yield* UserService.getById("user_1");
-});
+  return yield* UserService.getById("user_1")
+})
 
-const runtime = ManagedRuntime.make(UserService.Default);
+const runtime = ManagedRuntime.make(UserService.Default)
 
-runtime.runPromise(program).then(console.log);
+runtime.runPromise(program).then(console.log)
 
 /*
 Output:
@@ -1070,80 +918,80 @@ Create it once at application startup, then reuse it.
 A service describes _what_ your app needs, and a layer describes _how_ to build it.
 
 ```ts twoslash id="services-and-layers-example" collapse={1-57}
-import { Data, Effect, Layer, ManagedRuntime } from "effect";
+import { Data, Effect, Layer, ManagedRuntime } from "effect"
 
 interface User {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
 interface Appointment {
-  readonly id: string;
-  readonly userId: string;
+  readonly id: string
+  readonly userId: string
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly userId: string;
+  readonly userId: string
 }> {}
 
 class UserService extends Effect.Service<UserService>()("UserService", {
   accessors: true,
-  sync: () => ({
+  effect: Effect.sync(() => ({
     getById: (userId: string) =>
       Effect.gen(function* () {
         if (userId !== "user_1") {
-          return yield* new UserNotFound({ userId });
+          return yield* new UserNotFound({ userId })
         }
 
         return {
           id: userId,
           name: "John",
-        };
+        }
       }),
-  }),
+  })),
 }) {}
 
 class AppointmentService extends Effect.Service<AppointmentService>()(
   "AppointmentService",
   {
     accessors: true,
-    sync: () => ({
+    effect: Effect.sync(() => ({
       getByUserId: (userId: string) =>
         Effect.gen(function* () {
           if (userId !== "user_1") {
-            return yield* new AppointmentNotFound({ userId });
+            return yield* new AppointmentNotFound({ userId })
           }
 
           return {
             id: "appointment_1",
             userId,
-          };
+          }
         }),
-    }),
+    })),
   },
 ) {}
 
 const MainLayer = Layer.mergeAll(
   UserService.Default,
   AppointmentService.Default,
-);
+)
 
 const getAppointmentForUser = Effect.fn("getAppointmentForUser")(function* (
   userId: string,
 ) {
-  const user = yield* UserService.getById(userId);
-  const appointment = yield* AppointmentService.getByUserId(user.id);
+  const user = yield* UserService.getById(userId)
+  const appointment = yield* AppointmentService.getByUserId(user.id)
 
-  return appointment;
-});
+  return appointment
+})
 
-const runtime = ManagedRuntime.make(MainLayer);
+const runtime = ManagedRuntime.make(MainLayer)
 
-runtime.runPromise(getAppointmentForUser("user_1")).then(console.log);
+runtime.runPromise(getAppointmentForUser("user_1")).then(console.log)
 
 /*
 Output:
@@ -1182,13 +1030,13 @@ This is the point where Effect starts to feel like a framework, not just an erro
 Use `Effect.provide` when you're providing dependencies to a program:
 
 ```ts id="effect-provide"
-program.pipe(Effect.provide(MainLayer));
+program.pipe(Effect.provide(MainLayer))
 ```
 
 Use `Layer.provide` when you're providing dependencies to another layer:
 
 ```ts id="layer-provide"
-SomeLayer.pipe(Layer.provide(DependencyLayer));
+SomeLayer.pipe(Layer.provide(DependencyLayer))
 ```
 
 A simple beginner rule:
