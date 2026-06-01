@@ -5,33 +5,49 @@ import BaseLayout from "../../layouts/BaseLayout.astro"
 const posts = await getCollection("blog", ({ data }) => !data.draft)
 posts.sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
 ---
+
 <BaseLayout title="Blog" description="Technical blog posts">
-  <main class="container">
-    <header class="page-header">
-      <p class="eyebrow">Type-Safe Notes</p>
-      <h1>Effect + TypeScript Blog</h1>
-      <p class="lead">
+  <main class="mx-auto w-[min(44rem,calc(100%-3rem))] py-16 md:py-20">
+    <header>
+      <p
+        class="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-muted"
+      >
+        Type-Safe Notes
+      </p>
+      <h1
+        class="m-0 text-4xl font-semibold leading-[1.06] tracking-[-0.025em] sm:text-5xl"
+      >
+        Effect + TypeScript Blog
+      </h1>
+      <p class="mt-4 max-w-[65ch] leading-relaxed text-muted">
         Deep dives on Effect patterns, Twoslash examples, and practical
         architecture.
       </p>
     </header>
 
-    <div class="post-grid">
-      {posts.map((post) => (
-        <article class="post-card">
-          <a href={`/blog/${post.id}/`} class="post-title">{post.data.title}</a>
-          {post.data.description && (
-            <p class="post-description">{post.data.description}</p>
-          )}
-          <p class="post-date">
-            {post.data.pubDate.toLocaleDateString("en", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </p>
-        </article>
-      ))}
+    <div class="mt-10 grid gap-3">
+      {
+        posts.map((post) => (
+          <article class="rounded-md border border-border bg-panel p-5 transition-colors duration-150 hover:border-fg">
+            <a
+              href={`/blog/${post.id}/`}
+              class="text-xl font-semibold tracking-[-0.01em] text-inherit no-underline hover:underline hover:underline-offset-[0.2em]"
+            >
+              {post.data.title}
+            </a>
+            {post.data.description && (
+              <p class="text-muted">{post.data.description}</p>
+            )}
+            <p class="mb-0 text-sm text-muted">
+              {post.data.pubDate.toLocaleDateString("en", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
+          </article>
+        ))
+      }
     </div>
   </main>
 </BaseLayout>

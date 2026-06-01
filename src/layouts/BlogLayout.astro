@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "./BaseLayout.astro"
+import Prose from "../components/Prose.astro"
 
 type Props = {
   title: string
@@ -11,28 +12,36 @@ type Props = {
 const { title, description, pubDate, tags = [] } = Astro.props
 ---
 <BaseLayout title={title} description={description}>
-  <main class="container">
+  <main class="mx-auto w-[min(44rem,calc(100%-3rem))] py-16 md:py-20">
     <article>
-      <header class="post-header">
-        <p class="post-date">
+      <header>
+        <p class="mb-0 text-sm text-muted">
           {pubDate.toLocaleDateString("en", {
             year: "numeric",
             month: "long",
             day: "numeric",
           })}
         </p>
-        <h1>{title}</h1>
-        {description && <p class="lead">{description}</p>}
+        <h1 class="m-0 text-4xl font-semibold leading-[1.06] tracking-[-0.025em] sm:text-5xl">
+          {title}
+        </h1>
+        {description && (
+          <p class="mt-4 max-w-[65ch] leading-relaxed text-muted">{description}</p>
+        )}
         {tags.length > 0 && (
-          <div class="tag-row">
+          <div class="mt-4 flex flex-wrap gap-2">
             {tags.map((tag) => (
-              <span class="tag">{tag}</span>
+              <span class="rounded-md border border-border px-2.5 py-1 text-[0.8125rem] text-muted">
+                {tag}
+              </span>
             ))}
           </div>
         )}
       </header>
-      <div class="blog-content">
+      <div class="mt-8">
+        <Prose>
         <slot />
+        </Prose>
       </div>
     </article>
   </main>

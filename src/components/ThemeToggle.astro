@@ -7,25 +7,23 @@
   const root = document.documentElement
   const button = document.getElementById("theme-toggle")
 
-  const applyTheme = (theme) => {
-    root.dataset.theme = theme
-  }
-
+  /** @type {() => "light" | "dark"} */
   const getTheme = () => {
     const stored = localStorage.getItem(storageKey)
     if (stored === "light" || stored === "dark") return stored
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
   }
 
+  /** @type {"light" | "dark"} */
   let theme = getTheme()
-  applyTheme(theme)
+  root.dataset.theme = theme
 
   if (button) {
     button.textContent = theme === "dark" ? "Dark" : "Light"
     button.addEventListener("click", () => {
       theme = theme === "dark" ? "light" : "dark"
       localStorage.setItem(storageKey, theme)
-      applyTheme(theme)
+      root.dataset.theme = theme
       button.textContent = theme === "dark" ? "Dark" : "Light"
     })
   }

@@ -12,15 +12,18 @@
   },
   "dependencies": {
     "@astrojs/mdx": "^6.0.1",
+    "@tailwindcss/vite": "^4.3.0",
     "astro": "^6.4.2",
     "astro-expressive-code": "^0.41.2",
-    "effect": "^3.21.2"
+    "effect": "^3.21.2",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@expressive-code/core": "0.41.7",
     "@expressive-code/plugin-collapsible-sections": "^0.41.7",
     "@expressive-code/plugin-line-numbers": "^0.41.7",
+    "@tailwindcss/typography": "^0.5.19",
     "expressive-code": "0.41.7",
     "expressive-code-twoslash": "^0.6.0",
     "prettier": "^3.6.1",

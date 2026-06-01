@@ -1,43 +1,40 @@
-/* ============================================================
-   Blog styles — applies design.md
-   Aesthetic: refined black-and-white minimalism (Vercel / shadcn
-   / Linear / Emil Kowalski). Hierarchy from weight, size & space
-   only — no hue. Tokens are neutral-grayscale OKLCH.
-   Fonts: Geist Sans + Geist Mono (load via next/font or @font-face).
-   ============================================================ */
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
-/* ---- Design tokens -------------------------------------------------- */
-/* Naming kept from the original file so existing markup keeps working:
-   --bg = background, --fg = foreground, --muted = secondary text,
-   --panel = card surface. Added: --muted-bg (subtle fill), --ring,
-   --radius. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-muted-bg: var(--muted-bg);
+  --color-panel: var(--panel);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --radius-md: var(--radius);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
 
 :root {
   color-scheme: light;
 
-  --bg: oklch(1 0 0); /* #ffffff */
-  --fg: oklch(0.145 0 0); /* near-black, not pure #000 */
-  --muted: oklch(0.556 0 0); /* secondary text: meta, dates */
-  --muted-bg: oklch(0.97 0 0); /* subtle fills: inline code, hovers */
-  --panel: oklch(1 0 0); /* card surface */
-  --border: oklch(0.922 0 0); /* hairlines */
-  --ring: oklch(0.708 0 0); /* focus ring */
+  --bg: oklch(1 0 0);
+  --fg: oklch(0.145 0 0);
+  --muted: oklch(0.556 0 0);
+  --muted-bg: oklch(0.97 0 0);
+  --panel: oklch(1 0 0);
+  --border: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
 
-  --radius: 0.5rem; /* single radius everywhere */
+  --radius: 0.5rem;
 
   --font-sans: "Geist", "Geist Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
-  --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Dark tokens, shared by auto (OS) and manual (.dark) modes */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     color-scheme: dark;
-    --bg: oklch(
-      0.145 0 0
-    ); /* off-black; use oklch(0 0 0) for pure Vercel black */
+    --bg: oklch(0.145 0 0);
     --fg: oklch(0.985 0 0);
     --muted: oklch(0.708 0 0);
     --muted-bg: oklch(0.205 0 0);
@@ -58,8 +55,6 @@
   --ring: oklch(0.556 0 0);
 }
 
-/* ---- Base ----------------------------------------------------------- */
-
 * {
   box-sizing: border-box;
 }
@@ -70,7 +65,7 @@ body {
   font-family: var(--font-sans);
   font-size: 1.0625rem;
   line-height: 1.6;
-  background: var(--bg); /* solid — no decorative gradients */
+  background: var(--bg);
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -87,253 +82,7 @@ body {
   border-radius: calc(var(--radius) / 2);
 }
 
-/* ---- Layout: single narrow reading column --------------------------- */
-
-.container {
-  width: min(
-    44rem,
-    100% - 3rem
-  ); /* ~704px — the narrow measure does the work */
-  margin: 0 auto;
-  padding: 4rem 0 6rem;
-}
-
-/* ---- Headings ------------------------------------------------------- */
-/* Weight capped at 600; negative tracking on large type. */
-
-.page-header h1,
-.post-header h1 {
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.06;
-  font-size: clamp(2rem, 6vw, 3rem);
-}
-
-.eyebrow {
-  margin: 0 0 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-size: 0.75rem;
-  font-weight: 500; /* toned down from 700 */
-  color: var(--muted);
-}
-
-.lead {
-  margin-top: 1rem;
-  color: var(--muted);
-  max-width: 65ch;
-  line-height: 1.6;
-}
-
-/* ---- Post listing: quiet vertical stack ----------------------------- */
-
-.post-grid {
-  margin-top: 2.5rem;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.post-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  background: var(--panel);
-  transition:
-    border-color 150ms var(--ease),
-    background-color 150ms var(--ease);
-}
-
-.post-card:hover {
-  border-color: var(--fg);
-}
-
-.post-title {
-  color: inherit;
-  font-size: 1.25rem; /* h3 scale */
-  font-weight: 600; /* capped */
-  text-decoration: none;
-  letter-spacing: -0.01em;
-}
-
-.post-title:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-  text-decoration-color: var(--fg);
-}
-
-.post-description,
-.post-date {
-  color: var(--muted);
-}
-
-.post-date {
-  margin-bottom: 0;
-  font-size: 0.875rem; /* small token */
-}
-
-/* ---- Tags ----------------------------------------------------------- */
-
-.tag-row {
-  margin-top: 1.1rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.tag {
-  border: 1px solid var(--border);
-  border-radius: var(--radius); /* unified radius — no mixed shapes */
-  padding: 0.2rem 0.6rem;
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-
-/* ---- Article prose -------------------------------------------------- */
-
-.blog-content {
-  font-size: 1.0625rem;
-  line-height: 1.75; /* generous measure for reading */
-}
-
-.blog-content h1 {
-  margin-top: 3rem;
-  margin-bottom: 1rem;
-  font-size: 2rem;
-  font-weight: 600;
-  line-height: 1.15; /* tight — was inheriting body 1.75 */
-  letter-spacing: -0.025em;
-}
-
-.blog-content h2 {
-  margin-top: 3rem;
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.2; /* tight — was inheriting body 1.75 */
-  letter-spacing: -0.015em;
-}
-
-.blog-content h3 {
-  margin-top: 2rem;
-  margin-bottom: 0.75rem;
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-.blog-content > p {
-  margin: 1.5rem 0;
-}
-
-/* Restrained Emil-style links: muted underline → foreground on hover */
-.blog-content a {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--border);
-  text-underline-offset: 4px;
-  transition: text-decoration-color 150ms var(--ease);
-}
-
-.blog-content a:hover {
-  text-decoration-color: var(--fg);
-}
-
-.blog-content ul,
-.blog-content ol {
-  margin: 1.5rem 0;
-  padding-left: 1.5rem;
-}
-
-.blog-content li {
-  margin: 0.4rem 0;
-}
-
-.blog-content li::marker {
-  color: var(--muted);
-}
-
-.blog-content blockquote {
-  margin: 1.75rem 0;
-  padding-left: 1rem;
-  border-left: 2px solid var(--border);
-  color: var(--muted);
-  white-space: pre-wrap;
-}
-
-/* Horizontal rule: a single hairline, used sparingly */
-hr {
-  height: 0;
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 2.5rem 0;
-}
-
-.blog-content hr {
-  margin: 3rem 0; /* extra breathing room between sections */
-}
-
-/* Tables: horizontal hairlines only, weight-600 header, no zebra.
-   Scrolls horizontally on narrow screens. */
-.blog-content table {
-  display: block;
-  width: 100%;
-  margin: 1.75rem 0;
-  overflow-x: auto;
-  border-collapse: collapse;
-  font-size: 0.9375rem;
-  line-height: 1.5;
-}
-
-.blog-content thead th {
-  text-align: left;
-  font-weight: 600;
-  color: var(--fg);
-  white-space: nowrap;
-}
-
-.blog-content th,
-.blog-content td {
-  padding: 0.625rem 0.875rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-
-.blog-content th:first-child,
-.blog-content td:first-child {
-  padding-left: 0;
-}
-
-.blog-content th:last-child,
-.blog-content td:last-child {
-  padding-right: 0;
-}
-
-.blog-content tbody tr {
-  transition: background-color 150ms var(--ease);
-}
-
-.blog-content tbody tr:hover {
-  background: var(--muted-bg);
-}
-
-.blog-content tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.blog-content img {
-  max-width: 100%;
-  height: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-/* Inline code */
-.blog-content :not(pre) > code:not(.twoslash-popup-code) {
-  border-radius: calc(var(--radius) / 1.5);
-  padding: 0.15rem 0.4rem;
-  background: var(--muted-bg);
-  font-family: var(--font-mono);
-  font-size: 0.85em;
+.prose code::before,
+.prose code::after {
+  content: "" !important;
 }

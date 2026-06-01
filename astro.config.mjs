@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config"
 import mdx from "@astrojs/mdx"
+import tailwindcss from "@tailwindcss/vite"
 import astroExpressiveCode from "astro-expressive-code"
 import ecTwoSlash from "expressive-code-twoslash"
 import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers"
@@ -29,4 +30,7 @@ export default defineConfig({
     }),
     mdx(),
   ],
+  vite: {
+    plugins: [tailwindcss()],
+  },
 })
