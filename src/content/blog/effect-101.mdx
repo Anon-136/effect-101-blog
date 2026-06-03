@@ -1,5 +1,5 @@
 ---
-title: "Effect 101: How to Read Effect"
+title: "Effect 101: How to Read Effect Code"
 description: "Learning Effect like normal TypeScript"
 pubDate: 2026-06-01
 tags: ["effect", "typescript"]
@@ -324,20 +324,18 @@ The failure isn't hidden, it's right there in the type.
 
 ## Wait, Why Does `Effect.gen` Take No Arguments?
 
-This confuses a lot of beginners. You'll usually write:
+This confuses a lot of beginners. You will usually see:
 
 ```ts id="effect-gen-no-args-shape"
-const program = Effect.gen(function* () {
-  // ...
-})
+// ✅
+const program = Effect.gen(function* () { })
 ```
 
 Not:
 
 ```ts id="effect-gen-with-args-wrong-shape"
-const program = Effect.gen(function* (userId: string) {
-  // ...
-})
+// ❌
+const program = Effect.gen(function* (userId: string) { })
 ```
 
 Why?
@@ -369,7 +367,7 @@ It's already an `Effect`.
 
 It's a **result value** that **has not run yet**.
 
-Think of `Effect.Effect<Success, Error>` as a `Promise<Result<Success, Error>>` but the promise hasn't run yet.
+Think of `Effect.Effect<Success, Error>` as a `Promise<Result<Success, Error>>` but the promise hasn't started.
 
 That's why `Effect.gen` doesn't need arguments here, there's nothing to pass in at runtime. The program already knows everything it needs to know.
 
@@ -519,11 +517,36 @@ Output:
 */
 ```
 
-You can read `Effect.fn("getAppointmentForUser")` as:
-
-> Define a named function called `getAppointmentForUser` that returns an Effect
-
 That name isn't just decoration, it pays off in tracing, debugging, and observability. The argument is your business input, and the function still hands back a lazy Effect program, exactly like before.
+
+Under the hood, `Effect.fn` is just `Effect.gen` with a name attached. Remember the previous section: `Effect.gen` itself takes no arguments, so when you need inputs, you wrap it in an outer function. `Effect.fn` is that exact pattern, bundled up for you, plus a label for tracing.
+
+These two are the same thing:
+
+```ts id="effect-fn-vs-gen"
+const getUser = Effect.fn("getUser")(function* (userId: string) {
+  // ...
+})
+
+const getUser = (userId: string) =>
+  Effect.gen(function* () {
+    // ...
+  }).pipe(
+    Effect.withSpan("getUser")
+  )
+```
+
+The `Effect.fn` version saves you the outer arrow function and, in return, gives you a name.
+
+You can also pass a function that returns an Effect
+```ts id="effect-fn-with-effect-return"
+const getUser = Effect.fn("getUser")((userId: string) =>
+  Effect.gen(function* () {
+    // ...
+  }))
+```
+
+
 
 ---
 
@@ -565,6 +588,7 @@ const chargeCard = Effect.fn("chargeCard")(function* (balance: number) {
 const program = (balance: number) =>
   chargeCard(balance).pipe(
     Effect.catchAll((error) =>
+      // Change from failure to success channel
       Effect.succeed(
         `Payment failed: required ${error.required}, balance ${error.balance}`,
       ),
@@ -620,10 +644,10 @@ If you're just starting out, here's the style I'd nudge you toward: let `Effect.
 
 ```ts id="gen-for-logic-pipe-for-composition-shape"
 Effect.gen(function* () {
- ... // business logic lives here
+  // business logic lives here
 })
 .pipe(
- ... // composition happens here
+  // composition happens here
 )
 ```
 
@@ -702,7 +726,7 @@ class UserService {
 }
 ```
 
-In Effect, dependencies can instead live in the requirement channel, which means you don't have to manually thread them through every single function. Here's a small example.
+In Effect, dependencies can instead live in the **requirement channel**, which means you don't have to manually thread them through every single function. Here's a small example.
 
 ```ts twoslash id="dependency-injection-requirement-channel" collapse={1-30}
 import { Data, Effect } from "effect"
@@ -774,7 +798,7 @@ program.pipe(Effect.provide(UserService.Default))
 
 For real applications, though, you'll want to build a runtime once and reuse it.
 
-```ts twoslash id="managed-runtime-example" collapse={1-34}
+```ts twoslash id="managed-runtime-example" collapse={1-31}
 import { Data, Effect, ManagedRuntime } from "effect"
 
 interface User {
