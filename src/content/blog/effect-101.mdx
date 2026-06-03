@@ -222,8 +222,9 @@ Output:
 */
 ```
 
-Here's the neat part: notice we never wrote a return type. We let Effect infer it. Hover over `program` in your editor and the whole story is right there: `Effect<Appointment, BookingLookupError, never>`.
-Read it left to right like this:
+Here's the neat part: notice we never wrote a return type. We let Effect infer it. \ 
+Hover over `program` in your editor and the whole story is right there: \
+`Effect<Appointment, BookingLookupError, never>`. Read it left to right like this:
 
 > This program succeeds with an `Appointment`, \
 > may fail with `BookingLookupError`, \
@@ -832,17 +833,18 @@ The usual app pattern looks like this: build your services and layers once, crea
 
 A service describes _what_ your app needs, and a layer describes _how_ to build it.
 
-```ts twoslash id="services-and-layers-example" collapse={1-63}
+```ts twoslash id="services-and-layers-example" collapse={1-65}
 import { Data, Effect, Layer, ManagedRuntime } from "effect"
 
 interface User {
   readonly id: string
   readonly name: string
+  readonly nextAppointmentId: string
 }
 
 interface Appointment {
   readonly id: string
-  readonly userId: string
+  readonly status: "booked" | "cancelled"
 }
 
 class UserNotFound extends Data.TaggedError("UserNotFound")<{
@@ -850,7 +852,7 @@ class UserNotFound extends Data.TaggedError("UserNotFound")<{
 }> {}
 
 class AppointmentNotFound extends Data.TaggedError("AppointmentNotFound")<{
-  readonly userId: string
+  readonly appointmentId: string
 }> {}
 
 class UserService extends Effect.Service<UserService>()("UserService", {
@@ -864,6 +866,7 @@ class UserService extends Effect.Service<UserService>()("UserService", {
       const user: User = {
         id: userId,
         name: "John",
+        nextAppointmentId: "appointment_1",
       }
 
       return user
@@ -878,20 +881,20 @@ class AppointmentService extends Effect.Service<AppointmentService>()(
   {
     accessors: true,
     effect: Effect.sync(() => {
-      const getByUserId = Effect.fn("getByUserId")(function* (userId: string) {
-        if (userId !== "user_1") {
-          return yield* new AppointmentNotFound({ userId })
+      const getById = Effect.fn("getById")(function* (appointmentId: string) {
+        if (appointmentId !== "appointment_1") {
+          return yield* new AppointmentNotFound({ appointmentId })
         }
 
         const appointment: Appointment = {
           id: "appointment_1",
-          userId,
+          status: "booked",
         }
 
         return appointment
       })
 
-      return { getByUserId }
+      return { getById }
     }),
   },
 ) {}
@@ -905,7 +908,7 @@ const getAppointmentForUser = Effect.fn("getAppointmentForUser")(function* (
   userId: string,
 ) {
   const user = yield* UserService.getById(userId)
-  const appointment = yield* AppointmentService.getByUserId(user.id)
+  const appointment = yield* AppointmentService.getById(user.nextAppointmentId)
 
   return appointment
 })
@@ -916,7 +919,7 @@ runtime.runPromise(getAppointmentForUser("user_1")).then(console.log)
 
 /*
 Output:
-{ id: "appointment_1", userId: "user_1" }
+{ id: "appointment_1", status: "booked" }
 */
 ```
 
