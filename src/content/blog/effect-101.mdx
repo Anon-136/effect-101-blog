@@ -968,14 +968,6 @@ Most beginners reach for `Effect.provide` first, and you can pick up `Layer.prov
 
 ---
 
-## Putting It All Together
-
-Effect is a framework, and the easiest way in is to start with `Effect.gen`, which lets you write business logic that reads just like `async/await`. From there the rest falls into place: `yield*` is Effect's version of `await`, `.pipe()` handles the composition (error handling, tracing, retry, timeout, and providing layers), `Effect.fn` gives your effectful functions names and arguments, and `Data.TaggedError` defines your typed domain errors. On the outcome side, the failure channel is for errors you saw coming, the defect channel is for bugs and impossible states, and the requirement channel is your dependency injection, where `Layer` builds your dependencies and `ManagedRuntime` runs the whole thing with them.
-
-Once that clicks, Effect stops being scary. It was never a secret language, it's just TypeScript with the hidden parts switched on.
-
----
-
 ## Cheatsheet: Effect vs Normal TypeScript
 
 | Normal TypeScript                                     | Effect                                          | How to read it                                                  |
