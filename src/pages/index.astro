@@ -2,6 +2,8 @@
 import { getCollection } from "astro:content"
 import BaseLayout from "../layouts/BaseLayout.astro"
 
+return Astro.redirect("/effect-101-blog/effect-101")
+
 const posts = await getCollection("blog", ({ data }) => !data.draft)
 posts.sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
 ---
