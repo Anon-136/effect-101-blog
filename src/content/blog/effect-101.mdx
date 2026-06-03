@@ -6,7 +6,7 @@ tags: ["effect", "typescript"]
 draft: false
 ---
 
-Everyone warns you that [Effect.ts](https://effect.website/) has a steep learning curve. I felt it too. The first time I opened an Effect codebase and saw `Effect.gen`, `yield*`, `Layer`, `Runtime`, `Data.TaggedError`, and services scattered everywhere, my brain quietly went "nope." It looks like someone took TypeScript and replaced it with a secret language only the cool kids understand.
+Everyone warns you that [Effect.ts](https://effect.website/) has a steep learning curve. I felt it too. The first time I opened an Effect codebase and saw `Effect.gen`, `yield*`, `.pipe()`, `Data.TaggedError`, `Effect.fn`, and services scattered everywhere, my brain quietly went "nope." It looks like someone took TypeScript and replaced it with a secret language only the cool kids understand.
 
 Here's the good news: **it isn't**. Effect code is still just TypeScript. The whole curve is really about learning how to _read_ it, and once a few patterns click, the scary parts stop being scary. So let me walk you through the ones that mattered most.
 
@@ -556,9 +556,9 @@ Effect keeps track of different kinds of outcomes, and as a beginner it helps to
 
 | Channel | Meaning                  | Example                                               |
 | ------- | ------------------------ | ----------------------------------------------------- |
-| Success | The program succeeded    | `Effect.succeed(value)`                               |
-| Failure | Expected/tracked error   | `Effect.fail(error)` or `yield* new TaggedError(...)` |
-| Defect  | Unexpected/untracked bug | `Effect.die(error)` or unhandled throw                |
+| ✅ Success | The program succeeded    | `Effect.succeed(value)`                               |
+| ❌ Failure | Expected/tracked error   | `Effect.fail(error)` or `yield* new TaggedError(...)` |
+| 💀 Defect  | Unexpected/untracked bug | `Effect.die(error)` or unhandled throw                |
 
 Think of it this way: a _failure_ is "this is a normal error that can happen, and I want it tracked." A _defect_ is "this should never happen, or I didn't want to handle it as a typed failure."
 
@@ -993,23 +993,22 @@ Most beginners reach for `Effect.provide` first, and you can pick up `Layer.prov
 
 ---
 
-## Cheatsheet: Effect vs Normal TypeScript
+## Summary Cheatsheet: Normal TypeScript vs Effect
 
 | Normal TypeScript                                     | Effect                                          | How to read it                                                  |
 | ----------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
 | `Promise<A>`                                          | `Effect<A, E, R>`                               | A lazy program that can succeed, fail, and require dependencies |
 | `await promise`                                       | `yield* effect`                                 | Run this step and unwrap its success value                      |
-| Business logic                                        | `Effect.gen(function* () {})`                   | Easier to read than a long pipeline                             |
+| `async function() {}`                                 | `Effect.gen(function* () {})`                   | A lazy program that can use `yield*` to sequence effects        |
 | `return value`                                        | `Effect.succeed(value)`                         | Create a successful Effect                                      |
-| `throw error` for expected error                      | `yield* new TaggedError(...)`                   | Stop with a typed expected failure inside `Effect.gen`          |
-| `throw error` for expected error outside `Effect.gen` | `Effect.fail(error)`                            | Create a failed Effect directly                                 |
-| `throw error` for bug                                 | `Effect.die(error)`                             | Mark an impossible or unexpected defect                         |
+| `throw error`                                         | `yield* new TaggedError(...)`                   | Stop with a typed expected failure inside `Effect.gen`          |
+| `throw error`                                         | `Effect.fail(error)`                            | Create a failed Effect directly                                 |
+| `throw error`                                         | `Effect.die(error)`                             | Mark an impossible or unexpected defect                         |
 | `try/catch`                                           | `Effect.catchAll`, `Effect.catchTag`            | Handle expected typed failures                                  |
 | `catch (e) if e instanceof X`                         | `Effect.catchTag("X", handler)`                 | Handle one tagged error                                         |
 | `async function name(args)`                           | `Effect.fn("name")(function* (args) {})`        | Create a named effectful function                               |
 | Add tracing                                           | `.pipe(Effect.withSpan("name"))`                | Add operational behavior outside the main logic                 |
 | Add retry/timeout                                     | `.pipe(Effect.retry(...), Effect.timeout(...))` | Add policies around the program                                 |
-| Simple transforms                                     | `.pipe(Effect.map(...))`                        | Transform the success value                                     |
 | Retrieve dependencies                                 | `yield* Service` or service accessors           | Pull dependencies from the requirement channel                  |
 | Constructor dependency injection                      | `Effect.Service` + `Layer`                      | Define and build dependencies                                   |
 | Small local provide                                   | `program.pipe(Effect.provide(layer))`           | Provide dependencies to one program                             |
@@ -1023,7 +1022,7 @@ Most beginners reach for `Effect.provide` first, and you can pick up `Layer.prov
 
 If this got the patterns to click, here are the resources I'd point you to for going deeper.
 
-- **[Visual Effect](https://effect.kitlangton.com/)** — Interactive animations that make fibers, retries, and concurrency easier.
+- **[Visual Effect](https://effect.kitlangton.com/)** — Interactive animations that make Effect easier to see in action.
 - **[Effect Institute](https://www.effect.institute/)** — Short, semi-interactive lessons for learning Effect fundamentals.
 - **[Effect Solutions](https://www.effect.solutions/)** — Opinionated guide to structuring real-world Effect projects.
 - **[Effect Docs](https://effect.website/docs)** — Official reference from basics to advanced topics.
